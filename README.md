@@ -1,14 +1,14 @@
 # sails-forth
 
-A Clojure library designed to ... well, that part is up to you.
+Sails-forth is a clojure salesforce library.
 
 ## Usage
 
-FIXME
+It does nothing yet.
 
 ## License
 
-Copyright © 2015 FIXME
+Copyright © 2015 SparkFund
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
