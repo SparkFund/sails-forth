@@ -5,5 +5,4 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[clj-http "2.0.0"]
                  [org.clojure/clojure "1.7.0"]
-                 [org.clojure/core.typed "0.3.18"]]
-  :pedantic? :abort)
+                 [org.clojure/core.typed "0.3.18"]])
