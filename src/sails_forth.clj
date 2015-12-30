@@ -45,12 +45,13 @@
    url :- HttpUrl
    params :- (t/Option HttpParams)] :- HttpResponse
   (let [request (cond-> {:method method
-                         :headers headers
                          :url url
                          :throw-exceptions false
                          :accept :json
                          :coerce :always
                          :as :json-string-keys}
+                  (seq headers)
+                  (assoc :headers headers)
                   (and (seq params)
                        (= :post method))
                   (assoc :form-params params))]
@@ -106,10 +107,10 @@
         {:keys [status body]} response]
     (when (and (= 200 status)
                (sequential? body)
-               (every? (map map? body)))
+               (every? true? (map map? body)))
       (let [urls (map #(get % "url") body)]
         (when (every? identity urls)
-         urls)))))
+          urls)))))
 
 (t/defn derive-host
   [config :- Config] :- t/Str
@@ -118,12 +119,13 @@
 
 (t/defn build-state
   [config :- Config] :- State
-  (let [{:keys [version]} config]
+  (let [{:keys [version]} config
+        host (derive-host config)]
     (cond-> {:authentication nil
              :version-url nil
              :requests 0
-             :host (derive-host config)
-             :config config}
+             :host host
+             :config (assoc config :host host)}
       version (assoc :version-url (str "/services/data/v" version)))))
 
 (t/defn try-authentication
@@ -152,9 +154,10 @@
     (let [state (-> state
                     try-authentication
                     try-to-find-latest-version)
-          {:keys [authentication requests]} state
-          response (when-let [{:keys [access-token]} authentication]
-                     (let [headers {"Authorization" (str "Bearer " access-token)}]
+          {:keys [authentication requests version-url]} state
+          response (when-let [{:keys [access-token instance-url]} authentication]
+                     (let [url (str instance-url version-url url)
+                           headers {"Authorization" (str "Bearer " access-token)}]
                        (json-request method headers url params)))
           {:keys [status body]} response
           state (cond-> state
@@ -169,6 +172,7 @@
   (t/Atom1 State))
 
 (t/defn request!
+  "Issue the given request using the given client"
   [client :- SalesforceClient
    method :- HttpMethod
    url :- HttpUrl
