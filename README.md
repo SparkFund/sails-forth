@@ -1,10 +1,31 @@
 # sails-forth
 
-Sails-forth is a clojure salesforce library.
+Sails-forth is a clojure salesforce library. It is fully typed with core.typed.
+It uses a stateful client object to transparently handle authentication and
+version detection.
 
 ## Usage
 
-It does nothing yet.
+``` clojure
+(require '[sails-forth :as sf])
+
+(def config
+  {:username "..."
+   :password "..."
+   :token "..."
+   :consumer-key "..."
+   :consumer-secret "..."
+   :sandbox? false})
+
+(def client (sf/build-client config))
+
+(sf/request! client :get "/limits" {})
+
+(def object-id
+  (sf/create! client "contact" {:first_name "Spark" :last_name "Fund"}))
+
+(sf/delete! client "contact" object-id)
+```
 
 ## License
 
