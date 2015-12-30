@@ -18,9 +18,13 @@
   (t/Rec [v]
          (t/U t/Str
               t/Num
+              t/Bool
               (t/Value nil)
-              (t/Seq v)
+              (t/Vec v)
               (t/Map t/Str v))))
+
+(t/defalias JsonMap
+  (t/Map t/Str Json))
 
 (t/defalias HttpBody
   Json)
@@ -199,7 +203,10 @@
 
    The client may be used concurrently, but it may unnecessarily attempt
    to authenticate concurrently and may not update its internal request count
-   correctly."
+   correctly.
+
+   This fn explicitly makes no guarantees regarding the type of the client
+   entity, other than it can be used with the user-facing fns in this ns."
   [config :- Config] :- SalesforceClient
   (atom (build-state config)))
 
@@ -222,9 +229,9 @@
                   :status status
                   :body body}
             message (case status
-                      400 "Could not create invalid Salesforce object"
-                      nil "Could not authenticate to Salesforce"
-                      "Invalid Salesforce response")]
+                      400 "Could not create invalid salesforce object"
+                      nil "Could not authenticate to salesforce"
+                      "Invalid salesforce response")]
         (throw (ex-info message data))))))
 
 (t/defn delete!
@@ -244,5 +251,24 @@
                   :body body}
             message (case status
                       nil "Could not authenticate to salesforce"
-                      "Invalid Salesforce response")]
+                      "Invalid salesforce response")]
         (throw (ex-info message data))))))
+
+(t/defn list!
+  [client :- SalesforceClient
+   type :- SalesforceType] :- (t/Option JsonMap)
+  (let [url (str "/sobjects/" type)
+        response (request! client :get url {})
+        {:keys [status body]} response]
+    ;; TODO t/cast doesn't work with Json or JsonMap
+    (cond (and (= 200 status)
+               ((t/pred JsonMap) body))
+          body
+          (= 404 status)
+          nil
+          :else
+          (let [data {:type type
+                      :status status
+                      :body body}
+                message "Could not retrieve list of salesforce objects"]
+            (throw (ex-info message data))))))
