@@ -165,12 +165,80 @@
         (recur (assoc state :authentication nil) (inc tries))
         [state response]))))
 
+(t/defalias SalesforceClient
+  (t/Atom1 State))
+
 (t/defn request!
-  [state :- (t/Atom1 State)
+  [client :- SalesforceClient
    method :- HttpMethod
    url :- HttpUrl
    params :- HttpParams] :- (t/Option HttpResponse)
-  (let [[state' response] (request @state method url params)]
+  (let [[client' response] (request @client method url params)]
     ;; TODO could try to merge states, otherwise request count may be incorrect
-    (reset! state state')
+    (reset! client client')
     response))
+
+(t/defalias SalesforceId
+  t/Str)
+
+(t/defalias SalesforceType
+  t/Str)
+
+(t/defalias SalesforceAttrs
+  (t/Map t/Keyword t/Str))
+
+(t/defn build-client!
+  "Creates a stateful Salesforce client from the given config. The client
+   authenticates lazily and uses the latest Salesforce version if none is
+   specified. If an authenticated request receives an invalid authentication
+   response, the client will try to reauthenticate and retry the request.
+
+   The client may be used concurrently, but it may unnecessarily attempt
+   to authenticate concurrently and may not update its internal request count
+   correctly."
+  [config :- Config] :- SalesforceClient
+  (atom (build-state config)))
+
+(t/defn create!
+  "Creates an object of the given type and attrs using the given salesforce
+   client. If salesforce responds successfully, this returns the object's id,
+   otherwise this raises an exception."
+  [client :- SalesforceClient
+   type :- SalesforceType
+   attrs :- SalesforceAttrs] :- SalesforceId
+  (let [url (str "/sobjects" type "/")
+        response (request! client :put url attrs)
+        {:keys [status body]} response]
+    (if (and (= 201 status)
+             (map? body))
+      (let [{:strs [id]} body]
+        (t/cast t/Str id))
+      (let [data {:type type
+                  :attrs attrs
+                  :status status
+                  :body body}
+            message (case status
+                      400 "Could not create invalid Salesforce object"
+                      nil "Could not authenticate to Salesforce"
+                      "Invalid Salesforce response")]
+        (throw (ex-info message data))))))
+
+(t/defn delete!
+  "Deletes the object of the given type with the given id. This returns true
+   if it succeeds and raises an exception otherwise."
+  [client :- SalesforceClient
+   type :- SalesforceType
+   id :- SalesforceId] :- (t/Value true)
+  (let [url (str "/sobjects/" type "/" id)
+        response (request! client :delete url {})
+        {:keys [status body]} response]
+    (if (= 204 status)
+      true
+      (let [data {:type type
+                  :id id
+                  :status status
+                  :body body}
+            message (case status
+                      nil "Could not authenticate to salesforce"
+                      "Invalid Salesforce response")]
+        (throw (ex-info message data))))))
