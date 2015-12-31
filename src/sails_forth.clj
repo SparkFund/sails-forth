@@ -64,7 +64,6 @@
                   (and (seq params)
                        (= :get method))
                   (assoc :query-params params))]
-    (prn request)
     (http/request request)))
 
 (t/defalias Authentication
@@ -99,7 +98,15 @@
                 :client_secret consumer-secret
                 :grant_type "password"}
         url (str "https://" host "/services/oauth2/token")
-        response (json-request :post {} url params)
+        ;; TODO this is just like json-request except the body is form encoded
+        request {:method :post
+                 :url url
+                 :throw-exceptions false
+                 :form-params params
+                 :accept :json
+                 :coerce :always
+                 :as :json-string-keys}
+        response (http/request request)
         {:keys [status body]} response]
     (when (and (= 200 status)
                (map? body))
@@ -166,7 +173,10 @@
                     try-to-find-latest-version)
           {:keys [authentication requests version-url]} state
           response (when-let [{:keys [access-token instance-url]} authentication]
-                     (let [url (str instance-url version-url url)
+                     (let [url (if (and version-url
+                                        (.startsWith ^String url version-url))
+                                 (str instance-url url)
+                                 (str instance-url version-url url))
                            headers {"Authorization" (str "Bearer " access-token)}]
                        (json-request method headers url params)))
           {:keys [status body]} response
@@ -321,20 +331,27 @@
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
-;; TODO this should be able to return JsonMap alone?
-;; TODO this has some pagination feature; should we transparently concat them?
-(t/defn query!
-  [client :- SalesforceClient
-   query :- SalesforceQuery] :- (t/Option JsonMap)
+(t/ann ^:no-check query! [SalesforceClient SalesforceQuery -> (t/Vec JsonMap)])
+(defn query!
+  "Executes the given query and returns all results, eagerly fetching if there
+   is pagination"
+  [client query]
   (let [url "/query"
         params {:q query}
-        response (request! client :get url params)
-        {:keys [status body]} response]
-    (if (and (= 200 status)
-             ((t/pred JsonMap) body))
-      body
-      (let [data {:query query
-                  :status status
-                  :body body}
-            message "Could not execute salesforce query"]
-        (throw (ex-info message data))))))
+        response (request! client :get url params)]
+    (t/loop [response :- (t/Option HttpResponse) response
+             results :- (t/Vec JsonMap) []]
+      (let [{:keys [status body]} response]
+        (if (and (= 200 status)
+                 ((t/pred JsonMap) body))
+          (let [results (into results (get body "records"))]
+            (if (get body "done")
+              results
+              (let [url (get body "nextRecordsUrl")]
+                (recur (request! client :get url {})
+                       results))))
+          (let [data {:query query
+                      :status status
+                      :body body}
+                message "Could not execute salesforce query"]
+            (throw (ex-info message data))))))))
