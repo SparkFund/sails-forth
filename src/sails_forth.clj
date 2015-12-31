@@ -1,6 +1,7 @@
 (ns sails-forth
   (:require [clj-http.client :as http]
-            [clojure.core.typed :as t]))
+            [clojure.core.typed :as t]
+            [clojure.core.typed.unsafe :as tu]))
 
 (t/defalias HttpMethod
   (t/U ':get ':post ':patch ':put ':delete))
@@ -9,7 +10,7 @@
   t/Str)
 
 (t/defalias HttpParams
-  (t/Map t/Kw t/Any))
+  (t/Map t/Keyword t/Any))
 
 (t/defalias HttpStatus
   t/Int)
@@ -21,10 +22,10 @@
               t/Bool
               (t/Value nil)
               (t/Vec v)
-              (t/Map t/Str v))))
+              (t/Map t/Keyword v))))
 
 (t/defalias JsonMap
-  (t/Map t/Str Json))
+  (t/Map t/Keyword Json))
 
 (t/defalias HttpBody
   Json)
@@ -53,7 +54,7 @@
                          :throw-exceptions false
                          :accept :json
                          :coerce :always
-                         :as :json-string-keys}
+                         :as :json}
                   (seq headers)
                   (assoc :headers headers)
                   (and (not (nil? params))
@@ -67,9 +68,8 @@
     (http/request request)))
 
 (t/defalias Authentication
-  (t/HMap :mandatory {:instance-url t/Str
-                      :access-token t/Str}
-          :complete? true))
+  (t/HMap :mandatory {:instance_url t/Str
+                      :access_token t/Str}))
 
 (t/defalias Config
   (t/HMap :mandatory {:username t/Str
@@ -105,29 +105,25 @@
                  :form-params params
                  :accept :json
                  :coerce :always
-                 :as :json-string-keys}
+                 :as :json}
         response (http/request request)
         {:keys [status body]} response]
     (when (and (= 200 status)
-               (map? body))
-      (let [{:strs [instance_url access_token]} body]
-        (when (and (string? instance_url)
-                   (string? access_token))
-          {:instance-url instance_url
-           :access-token access_token})))))
+               ((t/pred Authentication) body))
+      body)))
 
-(t/ann ^:no-check versions [t/Str -> (t/Option (t/Seq HttpUrl))])
+(t/defalias Version
+  (t/HMap :mandatory {:url HttpUrl}))
+
+(t/ann ^:no-check versions [t/Str -> (t/Option (t/Vec HttpUrl))])
 (defn versions
   [url]
   (let [url (str url "/services/data/")
         response (json-request :get {} url nil)
         {:keys [status body]} response]
     (when (and (= 200 status)
-               (sequential? body)
-               (every? true? (map map? body)))
-      (let [urls (map #(get % "url") body)]
-        (when (every? identity urls)
-          urls)))))
+               ((t/pred (t/Seq Version)) body))
+      (mapv #(get % :url) body))))
 
 (t/defn derive-host
   [config :- Config] :- t/Str
@@ -158,7 +154,7 @@
   (let [{:keys [authentication requests version-url]} state]
     (cond-> state
       (and (not version-url) authentication)
-      (assoc :version-url (last (versions (:instance-url authentication)))
+      (assoc :version-url (last (versions (:instance_url authentication)))
              :requests (inc requests)))))
 
 (t/defn request
@@ -172,12 +168,12 @@
                     try-authentication
                     try-to-find-latest-version)
           {:keys [authentication requests version-url]} state
-          response (when-let [{:keys [access-token instance-url]} authentication]
+          response (when-let [{:keys [access_token instance_url]} authentication]
                      (let [url (if (and version-url
                                         (.startsWith ^String url version-url))
-                                 (str instance-url url)
-                                 (str instance-url version-url url))
-                           headers {"Authorization" (str "Bearer " access-token)}]
+                                 (str instance_url url)
+                                 (str instance_url version-url url))
+                           headers {"Authorization" (str "Bearer " access_token)}]
                        (json-request method headers url params)))
           {:keys [status body]} response
           state (cond-> state
@@ -229,6 +225,9 @@
   [config :- Config] :- SalesforceClient
   (atom (build-state config)))
 
+(t/defalias SalesforceEntity
+  (t/HMap :mandatory {:id SalesforceId}))
+
 (t/defn create!
   "Creates an object of the given type and attrs using the given salesforce
    client. If salesforce responds successfully, this returns the object's id,
@@ -240,9 +239,8 @@
         response (request! client :post url attrs)
         {:keys [status body]} response]
     (if (and (= 201 status)
-             (map? body))
-      (let [{:strs [id]} body]
-        (t/cast t/Str id))
+             ((t/pred SalesforceEntity) body))
+      (get (tu/ignore-with-unchecked-cast body SalesforceEntity) :id)
       (let [data {:type type
                   :attrs attrs
                   :status status
@@ -331,11 +329,18 @@
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
-(t/ann ^:no-check query! [SalesforceClient SalesforceQuery -> (t/Vec JsonMap)])
-(defn query!
+(t/defalias SalesforceQueryResults
+  (t/U (t/HMap :mandatory {:done (t/Value true)
+                           :records (t/Vec JsonMap)})
+       (t/HMap :mandatory {:done (t/Value false)
+                           :records (t/Vec JsonMap)
+                           :nextRecordsUrl HttpUrl})))
+
+(t/defn query!
   "Executes the given query and returns all results, eagerly fetching if there
    is pagination"
-  [client query]
+  [client :- SalesforceClient
+   query :- SalesforceQuery] :- (t/Vec JsonMap)
   (let [url "/query"
         params {:q query}
         response (request! client :get url params)]
@@ -343,13 +348,13 @@
              results :- (t/Vec JsonMap) []]
       (let [{:keys [status body]} response]
         (if (and (= 200 status)
-                 ((t/pred JsonMap) body))
-          (let [results (into results (get body "records"))]
-            (if (get body "done")
+                 ((t/pred SalesforceQueryResults) body))
+          (let [body (tu/ignore-with-unchecked-cast body SalesforceQueryResults)
+                results (into results (get body :records))]
+            (if (and (get body :done))
               results
-              (let [url (get body "nextRecordsUrl")]
-                (recur (request! client :get url {})
-                       results))))
+              (let [url (get body :nextRecordsUrl)]
+                (recur (request! client :get url {}) results))))
           (let [data {:query query
                       :status status
                       :body body}
