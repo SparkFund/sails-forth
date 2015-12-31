@@ -56,9 +56,15 @@
                          :as :json-string-keys}
                   (seq headers)
                   (assoc :headers headers)
+                  (and (not (nil? params))
+                       (or (= :post method)
+                           (= :patch method)))
+                  (assoc :form-params params
+                         :content-type :json)
                   (and (seq params)
-                       (= :post method))
-                  (assoc :form-params params))]
+                       (= :get method))
+                  (assoc :query-params params))]
+    (prn request)
     (http/request request)))
 
 (t/defalias Authentication
@@ -195,6 +201,9 @@
 (t/defalias SalesforceAttrs
   (t/Map t/Keyword t/Str))
 
+(t/defalias SalesforceQuery
+  t/Str)
+
 (t/defn build-client!
   "Creates a stateful Salesforce client from the given config. The client
    authenticates lazily and uses the latest Salesforce version if none is
@@ -217,8 +226,8 @@
   [client :- SalesforceClient
    type :- SalesforceType
    attrs :- SalesforceAttrs] :- SalesforceId
-  (let [url (str "/sobjects" type "/")
-        response (request! client :put url attrs)
+  (let [url (str "/sobjects/" type)
+        response (request! client :post url attrs)
         {:keys [status body]} response]
     (if (and (= 201 status)
              (map? body))
@@ -254,6 +263,27 @@
                       "Invalid salesforce response")]
         (throw (ex-info message data))))))
 
+(t/defn update!
+  "Updates the object of the given type with the given id. This returns true
+   if it succeeds and raises an exception otherwise."
+  [client :- SalesforceClient
+   type :- SalesforceType
+   id :- SalesforceId
+   attrs :- SalesforceAttrs] :- (t/Value true)
+  (let [url (str "/sobjects/" type "/" id)
+        response (request! client :patch url attrs)
+        {:keys [status body]} response]
+    (if (= 204 status)
+      true
+      (let [data {:type type
+                  :id id
+                  :status status
+                  :body body}
+            message (case status
+                      nil "Could not authenticate to salesforce"
+                      "Invalid salesforce response")]
+        (throw (ex-info message data))))))
+
 (t/defn list!
   [client :- SalesforceClient
    type :- SalesforceType] :- (t/Option JsonMap)
@@ -272,3 +302,39 @@
                       :body body}
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
+
+(t/defn describe!
+  [client :- SalesforceClient
+   type :- SalesforceType] :- (t/Option JsonMap)
+  (let [url (str "/sobjects/" type "/describe")
+        response (request! client :get url {})
+        {:keys [status body]} response]
+    (cond (and (= 200 status)
+               ((t/pred JsonMap) body))
+          body
+          (= 404 status)
+          nil
+          :else
+          (let [data {:type type
+                      :status status
+                      :body body}
+                message "Could not retrieve list of salesforce objects"]
+            (throw (ex-info message data))))))
+
+;; TODO this should be able to return JsonMap alone?
+;; TODO this has some pagination feature; should we transparently concat them?
+(t/defn query!
+  [client :- SalesforceClient
+   query :- SalesforceQuery] :- (t/Option JsonMap)
+  (let [url "/query"
+        params {:q query}
+        response (request! client :get url params)
+        {:keys [status body]} response]
+    (if (and (= 200 status)
+             ((t/pred JsonMap) body))
+      body
+      (let [data {:query query
+                  :status status
+                  :body body}
+            message "Could not execute salesforce query"]
+        (throw (ex-info message data))))))
