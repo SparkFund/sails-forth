@@ -311,14 +311,100 @@
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
+(t/defalias SalesforceFieldDescription
+  (t/HMap :mandatory {:createable t/Bool
+                      :mask t/Any
+                      :nameField t/Bool
+                      :deprecatedAndHidden t/Bool
+                      :unique t/Bool
+                      :dependentPicklist t/Bool
+                      :soapType t/Str
+                      :cascadeDelete t/Bool
+                      :htmlFormatted t/Bool
+                      :restrictedDelete t/Bool
+                      :scale t/AnyInteger
+                      :calculated t/Bool
+                      :name t/Str
+                      :byteLength t/AnyInteger
+                      :highScaleNumber t/Bool
+                      :precision t/AnyInteger
+                      :filterable t/Bool
+                      :digits t/AnyInteger
+                      :type t/Str
+                      :custom t/Bool
+                      :restrictedPicklist t/Bool
+                      :idLookup t/Bool
+                      :picklistValues (t/Vec t/Any)
+                      :referenceTargetField t/Any
+                      :defaultedOnCreate t/Bool
+                      :externalId t/Bool
+                      :controllerName t/Any
+                      :inlineHelpText t/Any
+                      :label t/Str
+                      :defaultValueFormula t/Any
+                      :sortable t/Bool
+                      :namePointing t/Bool
+                      :updateable t/Bool
+                      :length t/AnyInteger
+                      :caseSensitive t/Bool
+                      :nillable t/Bool
+                      :referenceTo (t/Vec t/Any)
+                      :displayLocationInDecimal t/Bool
+                      :writeRequiresMasterRead t/Bool
+                      :calculatedFormula t/Any
+                      :defaultValue nil
+                      :permissionable t/Bool
+                      :extraTypeInfo t/Any
+                      :relationshipOrder t/Any
+                      :encrypted t/Bool
+                      :filteredLookupInfo t/Any
+                      :autoNumber t/Bool
+                      :relationshipName t/Any
+                      :queryByDistance t/Bool
+                      :maskType t/Any
+                      :groupable t/Bool}))
+
+(t/defalias SalesforceObjectDescription
+  (t/HMap :mandatory {:mergeable t/Bool
+                      :deletable t/Bool
+                      :createable t/Bool
+                      :searchLayoutable t/Bool
+                      :supportedScopes t/Any
+                      :listviewable t/Any
+                      :deprecatedAndHidden t/Bool
+                      :urls t/Any
+                      :namedLayoutInfos (t/Vec t/Any)
+                      :labelPlural t/Str
+                      :feedEnabled t/Bool
+                      :name t/Str
+                      :retrieveable t/Bool
+                      :fields (t/Vec SalesforceFieldDescription)
+                      :layoutable t/Bool
+                      :triggerable t/Bool
+                      :childRelationships (t/Vec t/Any)
+                      :actionOverrides (t/Vec t/Any)
+                      :custom t/Bool
+                      :searchable t/Bool
+                      :activateable t/Bool
+                      :keyPrefix t/Str
+                      :undeletable t/Bool
+                      :label t/Str
+                      :customSetting t/Bool
+                      :updateable t/Bool
+                      :recordTypeInfos (t/Vec t/Any)
+                      :replicateable t/Bool
+                      :lookupLayoutable t/Any
+                      :compactLayoutable t/Bool
+                      :queryable t/Bool}))
+
 (t/defn describe!
   [client :- SalesforceClient
-   type :- SalesforceType] :- (t/Option JsonMap)
+   type :- SalesforceType] :- (t/Option SalesforceObjectDescription)
   (let [url (str "/sobjects/" type "/describe")
         response (request! client :get url {})
         {:keys [status body]} response]
     (cond (and (= 200 status)
-               ((t/pred JsonMap) body))
+               ((t/pred SalesforceObjectDescription) body))
           body
           (= 404 status)
           nil
