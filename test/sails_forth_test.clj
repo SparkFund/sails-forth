@@ -30,4 +30,16 @@
             (is (:authentication state))))
         (testing "caches authentication and version"
           (is (= 200 (:status (request! client :get "/limits" {}))))
-          (is (= 4 (:requests @client))))))))
+          (is (= 4 (:requests @client))))))
+    (testing "with invalid credentials"
+      (let [config (update config :token str "x")
+            client (build-client! config)]
+        (testing "cannot issue requests"
+          (is (nil? (request! client :get "/limits" {}))))
+        (testing "is not authenticated"
+          (let [state @client]
+            (is (not (:authentication state)))
+            (is (= 1 (:requests state)))))
+        (testing "attempts to authenticate again"
+          (request! client :get "/limits" {})
+          (is (= 2 (:requests @client))))))))
