@@ -311,6 +311,13 @@
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
+(t/defalias SalesforcePicklistValue
+  (t/HMap :mandatory {:active t/Bool
+                      :defaultValue t/Bool
+                      :label t/Str
+                      :validFor t/Any
+                      :value t/Str}))
+
 (t/defalias SalesforceFieldDescription
   (t/HMap :mandatory {:createable t/Bool
                       :mask t/Any
@@ -334,7 +341,7 @@
                       :custom t/Bool
                       :restrictedPicklist t/Bool
                       :idLookup t/Bool
-                      :picklistValues (t/Vec t/Any)
+                      :picklistValues (t/Vec SalesforcePicklistValue)
                       :referenceTargetField t/Any
                       :defaultedOnCreate t/Bool
                       :externalId t/Bool
@@ -352,7 +359,7 @@
                       :displayLocationInDecimal t/Bool
                       :writeRequiresMasterRead t/Bool
                       :calculatedFormula t/Any
-                      :defaultValue nil
+                      :defaultValue t/Any
                       :permissionable t/Bool
                       :extraTypeInfo t/Any
                       :relationshipOrder t/Any
@@ -364,6 +371,24 @@
                       :maskType t/Any
                       :groupable t/Bool}))
 
+(t/defalias SalesforceRecordTypeInfo
+  (t/HMap :mandatory {:available t/Bool
+                      :defaultRecordTypeMapping t/Bool
+                      :master t/Bool
+                      :name t/Str
+                      :recordTypeId SalesforceId
+                      :urls (t/Map t/Keyword HttpUrl)}))
+
+(t/defalias SalesforceChildRelationship
+  (t/HMap :mandatory {:cascadeDelete t/Bool
+                      :childSObject t/Str
+                      :deprecatedAndHidden t/Bool
+                      :field t/Str
+                      :junctionIdListName t/Any
+                      :junctionReferenceTo (t/Vec t/Any)
+                      :relationshipName (t/Option t/Str)
+                      :restrictedDelete t/Bool}))
+
 (t/defalias SalesforceObjectDescription
   (t/HMap :mandatory {:mergeable t/Bool
                       :deletable t/Bool
@@ -372,7 +397,7 @@
                       :supportedScopes t/Any
                       :listviewable t/Any
                       :deprecatedAndHidden t/Bool
-                      :urls t/Any
+                      :urls (t/Map t/Keyword HttpUrl)
                       :namedLayoutInfos (t/Vec t/Any)
                       :labelPlural t/Str
                       :feedEnabled t/Bool
@@ -381,7 +406,7 @@
                       :fields (t/Vec SalesforceFieldDescription)
                       :layoutable t/Bool
                       :triggerable t/Bool
-                      :childRelationships (t/Vec t/Any)
+                      :childRelationships (t/Vec SalesforceChildRelationship)
                       :actionOverrides (t/Vec t/Any)
                       :custom t/Bool
                       :searchable t/Bool
@@ -391,7 +416,7 @@
                       :label t/Str
                       :customSetting t/Bool
                       :updateable t/Bool
-                      :recordTypeInfos (t/Vec t/Any)
+                      :recordTypeInfos (t/Vec SalesforceRecordTypeInfo)
                       :replicateable t/Bool
                       :lookupLayoutable t/Any
                       :compactLayoutable t/Bool
