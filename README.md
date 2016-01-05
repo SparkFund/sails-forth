@@ -27,6 +27,11 @@ version detection.
 (sf/delete! client "contact" object-id)
 ```
 
+## Configuration
+
+You may find http://www.calvinfroedge.com/salesforce-how-to-generate-api-credentials/
+useful to help create your consumer-key and consumer-secret values.
+
 ## License
 
 Copyright © 2015 SparkFund
