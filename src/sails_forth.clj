@@ -487,3 +487,24 @@
                       :body body}
                 message "Could not execute salesforce query"]
             (throw (ex-info message data))))))))
+
+(t/defalias SalesforceLimit
+  (t/HMap :mandatory {:Max t/AnyInteger
+                      :Remaining t/AnyInteger}
+          :complete? true))
+
+(t/defalias SalesforceLimits
+  (t/Map t/Keyword SalesforceLimit))
+
+(t/defn limits!
+  [client :- SalesforceClient] :- SalesforceLimits
+  (let [response (request! client :get "/limits" {})
+        {:keys [status body]} response]
+    (prn body)
+    (if (and (= 200 status)
+             ((t/pred SalesforceLimits) body))
+      (tu/ignore-with-unchecked-cast body SalesforceLimits)
+      (let [data {:status status
+                  :body body}
+            message "Could not find salesforce limits"]
+        (throw (ex-info message data))))))
