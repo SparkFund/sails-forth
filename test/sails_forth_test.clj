@@ -42,4 +42,10 @@
             (is (= 1 (:requests state)))))
         (testing "attempts to authenticate again"
           (request! client :get "/limits" {})
-          (is (= 2 (:requests @client))))))))
+          (is (= 2 (:requests @client))))))
+    (testing "with a read-only client"
+      (let [config (assoc config :read-only? true)
+            client (build-client! config)]
+        (testing "cannot issue side effecting requests"
+          (doseq [method [:post :put :patch :delete]]
+            (is (thrown? Exception (request! client method "/anything" {})))))))))
