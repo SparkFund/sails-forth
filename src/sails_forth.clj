@@ -79,13 +79,15 @@
                       :consumer-secret t/Str}
           :optional {:version t/Int
                      :sandbox? t/Bool
-                     :host t/Str}))
+                     :host t/Str
+                     :read-only? t/Bool}))
 
 (t/defalias State
   (t/HMap :mandatory {:host t/Str
                       :authentication (t/Option Authentication)
                       :version-url (t/Option HttpUrl)
                       :requests t/Int
+                      :read-only? t/Bool
                       :config Config}
           :complete? true))
 
@@ -133,11 +135,13 @@
 (t/defn build-state
   [config :- Config] :- State
   (let [{:keys [version]} config
-        host (derive-host config)]
+        host (derive-host config)
+        read-only? (get config :read-only? false)]
     (cond-> {:authentication nil
              :version-url nil
              :requests 0
              :host host
+             :read-only? read-only?
              :config (assoc config :host host)}
       version (assoc :version-url (str "/services/data/v" version)))))
 
@@ -162,6 +166,18 @@
    method :- HttpMethod
    url :- HttpUrl
    params :- HttpParams] :- (t/HVec [State (t/Option HttpResponse)])
+  (when (and (:read-only? state)
+             (case method
+               :post true
+               :put true
+               :patch true
+               :delete true
+               false))
+    (let [data {:method method
+                :url url
+                :params params}
+          message "Read-only clients may not issue requests with side effects"]
+      (throw (ex-info message data))))
   (t/loop [state :- State state
            tries :- t/Int 0]
     (let [state (-> state
