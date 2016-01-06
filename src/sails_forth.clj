@@ -500,7 +500,6 @@
   [client :- SalesforceClient] :- SalesforceLimits
   (let [response (request! client :get "/limits" {})
         {:keys [status body]} response]
-    (prn body)
     (if (and (= 200 status)
              ((t/pred SalesforceLimits) body))
       (tu/ignore-with-unchecked-cast body SalesforceLimits)
