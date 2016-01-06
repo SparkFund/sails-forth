@@ -34,7 +34,7 @@ useful to help create your consumer-key and consumer-secret values.
 
 ## License
 
-Copyright © 2015 SparkFund
+Copyright © 2015-2016 SparkFund
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
