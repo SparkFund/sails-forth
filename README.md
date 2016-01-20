@@ -4,6 +4,10 @@ Sails-forth is a clojure salesforce library. It is fully typed with core.typed.
 It uses a stateful client object to transparently handle authentication and
 version detection.
 
+## Installation
+
+`sparkfund/sails-forth 0.1.0`
+
 ## Usage
 
 ``` clojure

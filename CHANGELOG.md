@@ -1,6 +1,3 @@
-# Change Log
-All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
+## 0.1.0
 
-## [Unreleased][unreleased]
-### Changed
-- Add build-client!, request!, create!, and delete! user-facing fns
+* Initial release: uses core.typed predicates to validate responses
