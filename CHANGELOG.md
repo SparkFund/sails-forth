@@ -1,3 +1,7 @@
+## In-progress
+
+* Add count! fn
+
 ## 0.1.1
 
 * Move user to sails-forth.repl and remove dependency on test ns

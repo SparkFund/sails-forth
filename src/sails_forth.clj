@@ -458,8 +458,10 @@
 
 (t/defalias SalesforceQueryResults
   (t/U (t/HMap :mandatory {:done (t/Value true)
+                           :totalSize t/AnyInteger
                            :records (t/Vec JsonMap)})
        (t/HMap :mandatory {:done (t/Value false)
+                           :totalSize t/AnyInteger
                            :records (t/Vec JsonMap)
                            :nextRecordsUrl HttpUrl})))
 
@@ -487,6 +489,31 @@
                       :body body}
                 message "Could not execute salesforce query"]
             (throw (ex-info message data))))))))
+
+;; :records could be (t/Value []) but t/pred doesn't work on that
+(t/defalias SalesforceCountQueryResults
+  (t/HMap :mandatory {:done (t/Value true)
+                      :totalSize t/AnyInteger
+                      :records (t/Vec Nothing)}))
+
+(t/defn count!
+  "Executes the given query and returns the total number of results.
+   This is intended for use with COUNT() queries."
+  [client :- SalesforceClient
+   query :- SalesforceQuery] :- t/AnyInteger
+  (let [url "/query"
+        params {:q query}
+        response (request! client :get url params)]
+    (let [{:keys [status body]} response]
+      (if (and (= 200 status)
+               ((t/pred SalesforceCountQueryResults) body))
+        (let [body (tu/ignore-with-unchecked-cast body SalesforceCountQueryResults)]
+          (get body :totalSize))
+        (let [data {:query query
+                    :status status
+                    :body body}
+              message "Could not execute salesforce count query"]
+          (throw (ex-info message data)))))))
 
 (t/defalias SalesforceLimit
   (t/HMap :mandatory {:Max t/AnyInteger
