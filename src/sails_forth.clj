@@ -480,7 +480,7 @@
                  ((t/pred SalesforceQueryResults) body))
           (let [body (tu/ignore-with-unchecked-cast body SalesforceQueryResults)
                 results (into results (get body :records))]
-            (if (and (get body :done))
+            (if (get body :done)
               results
               (let [url (get body :nextRecordsUrl)]
                 (recur (request! client :get url {}) results))))
@@ -494,7 +494,7 @@
 (t/defalias SalesforceCountQueryResults
   (t/HMap :mandatory {:done (t/Value true)
                       :totalSize t/AnyInteger
-                      :records (t/Vec Nothing)}))
+                      :records (t/Vec t/Nothing)}))
 
 (t/defn count!
   "Executes the given query and returns the total number of results.
