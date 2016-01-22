@@ -10,12 +10,19 @@
        " FROM " (name type)))
 
 (defn field->attr
-  [s]
-  (-> s
-      (string/replace #"__c\Z" "")
-      string/lower-case
-      (string/replace \_ \-)
-      keyword))
+  [field]
+  (let [{:keys [name type]} field
+        name' (string/replace name #"__c\Z" "")
+        custom? (not= name name')
+        attrize #(-> string/lower-case (string/replace \_ \-) keyword)]
+    (-> name'
+        (cond->
+          (and (= type "reference")
+               (not custom?))
+          (string/replace #"Id\Z" ""))
+        string/lower-case
+        (string/replace \_ \-)
+        keyword)))
 
 (defn get-type-description
   [client type]
@@ -23,25 +30,22 @@
     description
     (let [description (sf/describe! client (name type))
           {:keys [fields]} description
-          field-index (->> fields
-                           (map (juxt :name identity))
-                           (into {}))
           attr->field (->> fields
-                           (map :name)
                            (map (juxt field->attr identity))
                            (into {}))
+          field-index (->> fields
+                           (map (juxt (comp keyword :name) identity))
+                           (into {}))
           description (assoc description
-                             ::field-index field-index
                              ::attr->field attr->field
-                             ::field->attr (set/map-invert attr->field))]
+                             ::field-index field-index)]
       (swap! client assoc-in [::type type] description)
       description)))
 
 (defn get-field-description
   [client type attr]
-  (let [type-description (get-type-description client type)
-        field (get-in type-description [::attr->field attr])]
-    (get-in type-description [::field-index field])))
+  (let [type-description (get-type-description client type)]
+    (get-in type-description [::attr->field attr])))
 
 (def parse-value
   (let [date-formatter (tf/formatters :date-time)]
@@ -54,20 +58,15 @@
   [client type attrs]
   (let [description (get-type-description client type)
         attr->field (::attr->field description)
-        field->attr (::field->attr description)
         field-index (::field-index description)
         fields (map attr->field attrs)
-        field->type (->> fields
-                         (map field-index)
-                         (map (juxt :name :type))
-                         (into {}))
-        soql (build-soql type fields)
+        soql (build-soql type (map :name fields))
         records (sf/query! client soql)]
     (mapv (fn [record]
-            (reduce-kv (fn [accum field value]
-                         (let [attr (get field->attr (name field) field)
-                               type (get field->type (name field))
-                               value (parse-value type value)]
+            (reduce-kv (fn [accum field-key value]
+                         (let [field (get field-index field-key)
+                               attr (if field (field->attr field) field-key)
+                               value (if field (parse-value (:type field) value) value)]
                            (assoc accum attr value)))
                        {}
                        record))
