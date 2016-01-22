@@ -1,6 +1,7 @@
-## In-progress
+## 0.1.2
 
 * Add count! fn
+* Add sails-forth/query ns
 
 ## 0.1.1
 

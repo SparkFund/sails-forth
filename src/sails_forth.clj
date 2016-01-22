@@ -371,7 +371,7 @@
                       :length t/AnyInteger
                       :caseSensitive t/Bool
                       :nillable t/Bool
-                      :referenceTo (t/Vec t/Any)
+                      :referenceTo (t/Vec t/Str)
                       :displayLocationInDecimal t/Bool
                       :writeRequiresMasterRead t/Bool
                       :calculatedFormula t/Any

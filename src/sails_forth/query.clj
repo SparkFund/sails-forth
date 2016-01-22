@@ -1,9 +1,12 @@
 (ns sails-forth.query
   "Provides for executing queries using more idiomatic clojure forms"
   (:require [clj-time.format :as tf]
+            [clojure.core.typed :as t]
             [clojure.string :as string]
             [sails-forth :as sf]))
 
+(t/ann ^:no-check field->attr
+       [sf/SalesforceFieldDescription -> t/Keyword])
 (defn field->attr
   "Derives a clojurey attribute keyword representation of a Salesforce field.
    This converts snake case to kebob case, removes any custom field suffix,
@@ -21,6 +24,8 @@
         (string/replace \_ \-)
         keyword)))
 
+(t/ann ^:no-check get-type-description
+       [sf/SalesforceClient t/Keyword -> sf/SalesforceObjectDescription])
 (defn get-type-description
   "Obtains the description for a given type and builds some custom indexes
    into it. This will only fetch the type once for a given client."
@@ -42,12 +47,16 @@
                       (assoc-in state [::types type] description)))
       description)))
 
+(t/ann ^:no-check get-field-description
+       [sf/SalesforceClient t/Keyword t/Keyword -> sf/SalesforceFieldDescription])
 (defn get-field-description
   "Obtains the description for the given field on a type by its attribute"
   [client type attr]
   (let [type-description (get-type-description client type)]
     (get-in type-description [::attr->field attr])))
 
+(t/ann ^:no-check parse-value
+       [t/Str t/Any -> t/Any])
 (def parse-value
   "Parses the given value according to its type"
   (let [date-formatter (tf/formatters :date-time)]
@@ -56,6 +65,8 @@
         "datetime" (tf/parse date-formatter value)
         value))))
 
+(t/ann ^:no-check resolve-attr-path
+       [sf/SalesforceClient t/Keyword (t/Vec t/Keyword) -> (t/Vec sf/SalesforceFieldDescription)])
 (defn resolve-attr-path
   "Resolves a path of attrs against a given type, returning a path of fields.
    All but the last attr in a path must resolve to a reference type."
@@ -79,6 +90,8 @@
                attr-path'
                (conj fields field))))))
 
+(t/ann ^:no-check soql-field
+       [(t/Vec sf/SalesforceFieldDescription) -> t/Str])
 (defn soql-field
   "Creates a soql field string for the given seq of fields"
   [field-path]
@@ -98,6 +111,8 @@
                  field-path'))))))
 
 ;; TODO some support for WHERE clauses, obviously
+(t/ann ^:no-check soql-query
+       [sf/SalesforceClient t/Keyword (t/Vec (t/Vec sf/SalesforceFieldDescription)) -> t/Str])
 (defn soql-query
   "Creates a soql query string for the given client, type, and seq of field
    paths"
@@ -106,6 +121,8 @@
     (str "SELECT " (string/join "," soql-fields)
          " FROM " (name type))))
 
+(t/ann ^:no-check resolve-record-path
+       [(t/Vec sf/SalesforceFieldDescription) -> (t/Vec t/Keyword)])
 (defn resolve-record-path
   "Derives a seq of record keys for the given seq of fields, suitable for
    applying to the result of the underlying query! fn"
@@ -125,12 +142,14 @@
           (recur (conj record-path record-key)
                  field-path'))))))
 
+(t/ann ^:no-check query-attr-paths
+       [sf/SalesforceClient t/Keyword (t/Vec (t/Vec t/Keyword)) -> (t/Vec t/Any)])
 (defn query-attr-paths
   "Queries the given client and type for the given seq of attr-paths, e.g.
    [[:account :name] [:account :createdby :lastname]]"
   [client type attr-paths]
   (let [field-paths (mapv (partial resolve-attr-path client type) attr-paths)
-        soql (build-soql client type field-paths)
+        soql (soql-query client type field-paths)
         records (sf/query! client soql)]
     (mapv (fn [record]
             (reduce (fn [record' [field-path attr-path]]
@@ -144,6 +163,12 @@
                        (map vector field-paths attr-paths)))
           records)))
 
+(t/defalias Variant
+  (t/Rec [v]
+         (t/HVec [t/Keyword (t/U t/Keyword v) *])))
+
+(t/ann ^:no-check expand-variants
+       [Variant -> (t/Vec (t/Vec t/Keyword))])
 (defn expand-variants
   "Expands a variant path into a seq of attr paths"
   [variant-path]
@@ -155,6 +180,12 @@
             []
             refs)))
 
+(t/defalias Query
+  (t/HMap :mandatory {:find Variant}
+          :complete? true))
+
+(t/ann ^:no-check query
+       [sf/SalesforceClient Query -> (t/Vec t/Any)])
 (defn query
   "Returns the results of the given query against the given client. The query is
    a map with a :find keyword whose value must be a vector of keywords and
