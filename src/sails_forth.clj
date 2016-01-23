@@ -1,5 +1,6 @@
 (ns sails-forth
-  (:require [clj-http.client :as http]
+  (:require [cheshire.parse]
+            [clj-http.client :as http]
             [clojure.core.typed :as t]
             [clojure.core.typed.unsafe :as tu]))
 
@@ -43,6 +44,7 @@
                      :headers HttpHeaders}))
 
 (t/ann ^:no-check clj-http.client/request [HttpRequest -> HttpResponse])
+(t/ann ^:no-check cheshire.parse/*use-bigdecimals?* t/Bool)
 
 (t/defn json-request
   [method :- HttpMethod
@@ -65,7 +67,8 @@
                   (and (seq params)
                        (= :get method))
                   (assoc :query-params params))]
-    (http/request request)))
+    (binding [cheshire.parse/*use-bigdecimals?* true]
+      (http/request request))))
 
 (t/defalias Authentication
   (t/HMap :mandatory {:instance_url t/Str

@@ -59,10 +59,12 @@
        [t/Str t/Any -> t/Any])
 (def parse-value
   "Parses the given value according to its type"
-  (let [date-formatter (tf/formatters :date-time)]
+  (let [date-time-formatter (tf/formatters :date-time)
+        date-formatter (tf/formatters :date)]
     (fn [type value]
       (case type
-        "datetime" (tf/parse date-formatter value)
+        "datetime" (tf/parse date-time-formatter value)
+        "date" (tf/parse date-formatter value)
         value))))
 
 (t/ann ^:no-check resolve-attr-path

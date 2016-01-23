@@ -2,6 +2,8 @@
 
 * Add count! fn
 * Add sails-forth/query ns
+* Configure cheshire to parse json numbers as bigdecimals
+* Parse dates and datetimes as joda instances
 
 ## 0.1.1
 
