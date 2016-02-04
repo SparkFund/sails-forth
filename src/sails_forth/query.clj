@@ -1,6 +1,7 @@
 (ns sails-forth.query
   "Provides for executing queries using more idiomatic clojure forms"
-  (:require [clj-time.format :as tf]
+  (:require [clj-time.coerce :as tc]
+            [clj-time.format :as tf]
             [clojure.core.typed :as t]
             [clojure.string :as string]
             [sails-forth :as sf]))
