@@ -64,7 +64,7 @@
     (fn [type value]
       (case type
         "datetime" (tf/parse date-time-formatter value)
-        "date" (tf/parse date-formatter value)
+        "date" (tc/to-local-date (tf/parse date-formatter value))
         value))))
 
 (t/ann ^:no-check resolve-attr-path
