@@ -1,3 +1,7 @@
+## 0.1.3
+
+* Convert date fields to joda local-date instances
+
 ## 0.1.2
 
 * Add count! fn
