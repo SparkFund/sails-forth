@@ -57,16 +57,24 @@
     (get-in type-description [::attr->field attr])))
 
 (t/ann ^:no-check parse-value
-       [t/Str t/Any -> t/Any])
+       [sf/SalesforceFieldDescription t/Any -> t/Any])
 (def parse-value
-  "Parses the given value according to its type"
+  "Parses the given value according to its field type and other characteristics"
   (let [date-time-formatter (tf/formatters :date-time)
-        date-formatter (tf/formatters :date)]
-    (fn [type value]
-      (case type
-        "datetime" (tf/parse date-time-formatter value)
-        "date" (tc/to-local-date (tf/parse date-formatter value))
-        value))))
+        date-formatter (tf/formatters :date)
+        max-long-precision (dec (count (str Long/MAX_VALUE)))]
+    (fn [field value]
+      (let [{:keys [type scale precision]} field]
+        (case type
+          "datetime" (tf/parse date-time-formatter value)
+          "date" (tc/to-local-date (tf/parse date-formatter value))
+          "double" (if (= 0 scale)
+                     (if (<= precision max-long-precision)
+                       (long value)
+                       (bigint value))
+                     value)
+          "int" (long value)
+          value)))))
 
 (t/ann ^:no-check resolve-attr-path
        [sf/SalesforceClient t/Keyword (t/Vec t/Keyword) -> (t/Vec sf/SalesforceFieldDescription)])
@@ -158,10 +166,10 @@
             (reduce (fn [record' [field-path attr-path]]
                       (let [record-path (resolve-record-path field-path)
                             value (get-in record record-path)
-                            type (:type (last field-path))]
+                            field (last field-path)]
                         (cond-> record'
                           value
-                          (assoc-in attr-path (parse-value type value)))))
+                          (assoc-in attr-path (parse-value field value)))))
                        {}
                        (map vector field-paths attr-paths)))
           records)))
