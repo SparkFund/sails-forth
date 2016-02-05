@@ -1,6 +1,7 @@
 ## 0.1.3
 
 * Convert date fields to joda local-date instances
+* Convert some double and int fields to integral types
 
 ## 0.1.2
 
