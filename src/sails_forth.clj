@@ -494,7 +494,7 @@
         {:keys [status body]} response]
     (cond (and (= 200 status)
                ((t/pred SalesforceObjectsOverview) body))
-          body
+          (tu/ignore-with-unchecked-cast body SalesforceObjectsOverview)
           :else
           (let [data {:status status
                       :body body}
