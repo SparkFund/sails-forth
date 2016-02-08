@@ -6,7 +6,7 @@ version detection.
 
 ## Installation
 
-`sparkfund/sails-forth 0.1.3`
+`sparkfund/sails-forth 0.1.4`
 
 ## Usage
 

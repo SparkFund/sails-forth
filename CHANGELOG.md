@@ -1,3 +1,8 @@
+## 0.1.4
+
+* Add type registry to allow custom objects to have nicer type names
+* Add helper fn to resolve attrs by labels
+
 ## 0.1.3
 
 * Convert date fields to joda local-date instances
