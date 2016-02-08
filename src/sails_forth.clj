@@ -456,6 +456,48 @@
           (let [data {:type type
                       :status status
                       :body body}
+                message "Could not retrieve description of salesforce object"]
+            (throw (ex-info message data))))))
+
+(t/defalias SalesforceObjectOverview
+  (t/HMap :mandatory {:mergeable t/Bool
+                      :deletable t/Bool
+                      :createable t/Bool
+                      :deprecatedAndHidden t/Bool
+                      :urls (t/Map t/Keyword HttpUrl)
+                      :labelPlural t/Str
+                      :feedEnabled t/Bool
+                      :name t/Str
+                      :retrieveable t/Bool
+                      :triggerable t/Bool
+                      :layoutable t/Bool
+                      :custom t/Bool
+                      :searchable t/Bool
+                      :activateable t/Bool
+                      :keyPrefix (t/Option t/Str)
+                      :undeletable t/Bool
+                      :label t/Str
+                      :customSetting t/Bool
+                      :updateable t/Bool
+                      :replicateable t/Bool
+                      :queryable t/Bool}))
+
+(t/defalias SalesforceObjectsOverview
+  (t/HMap :mandatory {:encoding t/Str
+                      :maxBatchSize t/AnyInteger
+                      :sobjects (t/Vec SalesforceObjectOverview)}))
+
+(t/defn objects!
+  [client :- SalesforceClient] :- SalesforceObjectsOverview
+  (let [url "/sobjects"
+        response (request! client :get url {})
+        {:keys [status body]} response]
+    (cond (and (= 200 status)
+               ((t/pred SalesforceObjectsOverview) body))
+          body
+          :else
+          (let [data {:status status
+                      :body body}
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
