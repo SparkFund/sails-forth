@@ -25,28 +25,76 @@
         (string/replace \_ \-)
         keyword)))
 
+(t/ann ^:no-check object->type
+       [sf/SalesforceObjectOverview -> t/Keyword])
+(defn object->type
+  "Derives a clojurey type keyword representation of a Salesforce object.
+   This conveerts snake case to kebob case and removes any custom field suffix."
+  [object]
+  (let [{:keys [name custom]} object
+        name' (string/replace name #"__c\Z" "")]
+    (-> name'
+        string/lower-case
+        (string/replace #"_{1,2}" "-")
+        keyword)))
+
+(t/ann ^:no-check set-map
+       [(t/Seqable (t/HVec [t/Keyword t/Any])) -> (t/Map t/Keyword t/Any)])
+(defn set-map
+  "Builds a map from the given seq of entries, raising on any duplicate key"
+  [entries]
+  (reduce (fn [accum [k v]]
+            (when (contains? accum k)
+              (let [msg "Duplicate key given for map"]
+                (throw (ex-info msg {:key k :entries entries}))))
+            (assoc accum k v))
+          {}
+          entries))
+
+(t/ann ^:no-check get-types
+       [sf/SalesforceClient -> (t/Map t/Keyword sf/SalesforceObjectOverview)])
+(defn get-types
+  [client]
+  (if-let [types (get-in @client [::types])]
+    types
+    (let [objects (sf/objects! client)
+          {:keys [sobjects]} objects
+          type->object (->> sobjects
+                            (map (juxt object->type identity))
+                            set-map)]
+      (swap! client (fn [state] (assoc state ::types type->object)))
+      type->object)))
+
 (t/ann ^:no-check get-type-description
-       [sf/SalesforceClient t/Keyword -> sf/SalesforceObjectDescription])
+       [sf/SalesforceClient t/Keyword -> (t/Option sf/SalesforceObjectDescription)])
 (defn get-type-description
   "Obtains the description for a given type and builds some custom indexes
    into it. This will only fetch the type once for a given client."
   [client type]
-  (if-let [description (get-in @client [::types type])]
-    description
-    (let [description (sf/describe! client (name type))
-          {:keys [fields]} description
-          attr->field (->> fields
-                           (map (juxt field->attr identity))
-                           (into {}))
-          field-index (->> fields
-                           (map (juxt (comp keyword :name) identity))
-                           (into {}))
-          description (assoc description
-                             ::attr->field attr->field
-                             ::field-index field-index)]
-      (swap! client (fn [state]
-                      (assoc-in state [::types type] description)))
-      description)))
+  (when-let [overview (type (get-types client))]
+    (if (:fields overview)
+      overview
+      (when-let [description (sf/describe! client (:name overview))]
+        (let [{:keys [fields]} description
+              attr->field (->> fields
+                               (map (juxt field->attr identity))
+                               set-map)
+              field-index (->> fields
+                               (map (juxt (comp keyword :name) identity))
+                               set-map)
+              label-index (reduce (fn [accum field]
+                                    (let [attr (field->attr field)
+                                          {:keys [label]} field]
+                                      (update accum label (fnil conj #{}) attr)))
+                                  {}
+                                  fields)
+              description (assoc description
+                                 ::attr->field attr->field
+                                 ::field-index field-index
+                                 ::label-index label-index)]
+          (swap! client (fn [state]
+                          (assoc-in state [::types type] description)))
+          description)))))
 
 (t/ann ^:no-check get-field-description
        [sf/SalesforceClient t/Keyword t/Keyword -> sf/SalesforceFieldDescription])
@@ -55,6 +103,14 @@
   [client type attr]
   (let [type-description (get-type-description client type)]
     (get-in type-description [::attr->field attr])))
+
+(t/ann ^:no-check get-attrs-for-label
+       [sf/SalesforceClient t/Keyword t/Str -> (t/Set t/Keyword)])
+(defn get-attrs-for-label
+  "Returns the set of attributes on the given type that have the given label"
+  [client type label]
+  (let [description (get-type-description client type)]
+    (get (::label-index description) label)))
 
 (t/ann ^:no-check parse-value
        [sf/SalesforceFieldDescription t/Any -> t/Any])
@@ -128,9 +184,10 @@
   "Creates a soql query string for the given client, type, and seq of field
    paths"
   [client type field-paths]
-  (let [soql-fields (map soql-field field-paths)]
+  (let [description (get-type-description client type)
+        soql-fields (map soql-field field-paths)]
     (str "SELECT " (string/join "," soql-fields)
-         " FROM " (name type))))
+         " FROM " (:name description))))
 
 (t/ann ^:no-check resolve-record-path
        [(t/Vec sf/SalesforceFieldDescription) -> (t/Vec t/Keyword)])
