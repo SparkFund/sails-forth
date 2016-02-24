@@ -214,21 +214,27 @@
        [sf/SalesforceClient t/Keyword (t/Vec (t/Vec t/Keyword)) -> (t/Vec t/Any)])
 (defn query-attr-paths
   "Queries the given client and type for the given seq of attr-paths, e.g.
-   [[:account :name] [:account :createdby :lastname]]"
+   [[:account :name] [:account :createdby :lastname]]. This returns a vector
+   of maps with keyword paths matching each of the attr-paths, e.g.
+   {:account {:name ... :createdby {:lastname ...}}}. The base type will also
+   have metadata with a :url resolvable by the current client."
   [client type attr-paths]
   (let [field-paths (mapv (partial resolve-attr-path client type) attr-paths)
         soql (soql-query client type field-paths)
         records (sf/query! client soql)]
     (mapv (fn [record]
-            (reduce (fn [record' [field-path attr-path]]
-                      (let [record-path (resolve-record-path field-path)
-                            value (get-in record record-path)
-                            field (last field-path)]
-                        (cond-> record'
-                          value
-                          (assoc-in attr-path (parse-value field value)))))
-                       {}
-                       (map vector field-paths attr-paths)))
+            (let [url (get-in record [:attributes :url])]
+              (with-meta
+                (reduce (fn [record' [field-path attr-path]]
+                          (let [record-path (resolve-record-path field-path)
+                                value (get-in record record-path)
+                                field (last field-path)]
+                            (cond-> record'
+                              value
+                              (assoc-in attr-path (parse-value field value)))))
+                        {}
+                        (map vector field-paths attr-paths))
+                {:url url})))
           records)))
 
 (t/defalias Variant
