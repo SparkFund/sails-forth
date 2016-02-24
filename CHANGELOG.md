@@ -1,3 +1,8 @@
+## 0.1.5
+
+* Fix bug in field description type
+* Add url metadata to sails-forth.query/query
+
 ## 0.1.4
 
 * Add type registry to allow custom objects to have nicer type names
@@ -11,7 +16,7 @@
 ## 0.1.2
 
 * Add count! fn
-* Add sails-forth/query ns
+* Add sails-forth.query ns
 * Configure cheshire to parse json numbers as bigdecimals
 * Parse dates and datetimes as joda instances
 
