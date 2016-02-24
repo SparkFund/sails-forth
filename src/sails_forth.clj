@@ -333,7 +333,7 @@
 (t/defalias SalesforcePicklistValue
   (t/HMap :mandatory {:active t/Bool
                       :defaultValue t/Bool
-                      :label t/Str
+                      :label (t/Option t/Str)
                       :validFor t/Any
                       :value t/Str}))
 
@@ -437,6 +437,7 @@
                       :updateable t/Bool
                       :recordTypeInfos (t/Vec SalesforceRecordTypeInfo)
                       :replicateable t/Bool
+                      :networkScopeFieldName t/Any
                       :lookupLayoutable t/Any
                       :compactLayoutable t/Bool
                       :queryable t/Bool}))
