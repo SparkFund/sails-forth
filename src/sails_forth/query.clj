@@ -6,8 +6,22 @@
             [clojure.string :as string]
             [sails-forth :as sf]))
 
+;; TODO clarify types and add types for where clauses
+
+(t/defalias Attr
+  "An Attr is a keyword that refers to a Salesforce object or field"
+  t/Keyword)
+
+(t/defalias AttrPath
+  "An AttrPath is a vector of keywords that is resolved against a Salesforce
+   object or database to yield an object or field"
+  (t/NonEmptyVec Attr))
+
+(t/defalias FieldPath
+  (t/NonEmptyVec sf/SalesforceFieldDescription))
+
 (t/ann ^:no-check field->attr
-       [sf/SalesforceFieldDescription -> t/Keyword])
+       [sf/SalesforceFieldDescription -> Attr])
 (defn field->attr
   "Derives a clojurey attribute keyword representation of a Salesforce field.
    This converts snake case to kebob case, removes any custom field suffix,
@@ -25,11 +39,29 @@
         (string/replace \_ \-)
         keyword)))
 
-(t/ann ^:no-check object->type
-       [sf/SalesforceObjectOverview -> t/Keyword])
-(defn object->type
+(t/ann ^:no-check field->refers-attr
+       [sf/SalesforceFieldDescription -> Attr])
+(defn field->refers-attr
+  "Derives a clojurey attribute keyword representation of the Salesforce
+   relation about which this field refers"
+  [field]
+  (let [{:keys [referenceTo type]} field]
+    (when (or (not= "reference" type)
+              (not (and (= 1 (count referenceTo))
+                        (string? (first referenceTo)))))
+      (throw (IllegalArgumentException. "Invalid reference field")))
+    (-> referenceTo
+        first
+        (string/replace #"__c\Z" "")
+        string/lower-case
+        (string/replace \_ \-)
+        keyword)))
+
+(t/ann ^:no-check object->attr
+       [sf/SalesforceObjectOverview -> Attr])
+(defn object->attr
   "Derives a clojurey type keyword representation of a Salesforce object.
-   This conveerts snake case to kebob case and removes any custom field suffix."
+   This converts snake case to kebob case and removes any custom field suffix."
   [object]
   (let [{:keys [name custom]} object
         name' (string/replace name #"__c\Z" "")]
@@ -39,7 +71,7 @@
         keyword)))
 
 (t/ann ^:no-check set-map
-       [(t/Seqable (t/HVec [t/Keyword t/Any])) -> (t/Map t/Keyword t/Any)])
+       [(t/Seqable (t/HSeq [t/Keyword t/Any])) -> '{}])
 (defn set-map
   "Builds a map from the given seq of entries, raising on any duplicate key"
   [entries]
@@ -52,21 +84,22 @@
           entries))
 
 (t/ann ^:no-check get-types
-       [sf/SalesforceClient -> (t/Map t/Keyword sf/SalesforceObjectOverview)])
+       [sf/SalesforceClient -> (t/Map Attr sf/SalesforceObjectOverview)])
 (defn get-types
+  "Obtains a map of descriptions by type"
   [client]
   (if-let [types (get-in @client [::types])]
     types
     (let [objects (sf/objects! client)
           {:keys [sobjects]} objects
           type->object (->> sobjects
-                            (map (juxt object->type identity))
+                            (map (juxt object->attr identity))
                             set-map)]
       (swap! client (fn [state] (assoc state ::types type->object)))
       type->object)))
 
 (t/ann ^:no-check get-type-description
-       [sf/SalesforceClient t/Keyword -> (t/Option sf/SalesforceObjectDescription)])
+       [sf/SalesforceClient Attr -> (t/Option sf/SalesforceObjectDescription)])
 (defn get-type-description
   "Obtains the description for a given type and builds some custom indexes
    into it. This will only fetch the type once for a given client."
@@ -96,8 +129,15 @@
                           (assoc-in state [::types type] description)))
           description)))))
 
+(t/ann ^:no-check get-fields
+       [sf/SalesforceClient Attr -> (t/Option (t/Map Attr sf/SalesforceFieldDescription))])
+(defn get-fields
+  "Obtains a map of descriptions by field for the given type"
+  [client type]
+  (::attr->field (get-type-description client type)))
+
 (t/ann ^:no-check get-field-description
-       [sf/SalesforceClient t/Keyword t/Keyword -> sf/SalesforceFieldDescription])
+       [sf/SalesforceClient Attr Attr -> (t/Option sf/SalesforceFieldDescription)])
 (defn get-field-description
   "Obtains the description for the given field on a type by its attribute"
   [client type attr]
@@ -105,7 +145,7 @@
     (get-in type-description [::attr->field attr])))
 
 (t/ann ^:no-check get-attrs-for-label
-       [sf/SalesforceClient t/Keyword t/Str -> (t/Set t/Keyword)])
+       [sf/SalesforceClient Attr t/Str -> (t/Set Attr)])
 (defn get-attrs-for-label
   "Returns the set of attributes on the given type that have the given label"
   [client type label]
@@ -133,7 +173,7 @@
           value)))))
 
 (t/ann ^:no-check resolve-attr-path
-       [sf/SalesforceClient t/Keyword (t/Vec t/Keyword) -> (t/Vec sf/SalesforceFieldDescription)])
+       [sf/SalesforceClient Attr AttrPath -> FieldPath])
 (defn resolve-attr-path
   "Resolves a path of attrs against a given type, returning a path of fields.
    All but the last attr in a path must resolve to a reference type."
@@ -148,50 +188,76 @@
             attr-path' (next attr-path)]
         (when-not field
           (throw (IllegalArgumentException. "Invalid attr path")))
-        (when (and attr-path'
-                   (or (not= "reference" (:type field))
-                       (not (and (= 1 (count (:referenceTo field)))
-                                 (string? (first (:referenceTo field)))))))
-          (throw (IllegalArgumentException. "Invalid attr path")))
-        (recur (some-> field :referenceTo first string/lower-case keyword)
+        (recur (when attr-path'
+                 (field->refers-attr field))
                attr-path'
                (conj fields field))))))
 
-(t/ann ^:no-check soql-field
-       [(t/Vec sf/SalesforceFieldDescription) -> t/Str])
-(defn soql-field
-  "Creates a soql field string for the given seq of fields"
-  [field-path]
-  (loop [ref-path []
-         field-path field-path]
-    (if-not (seq field-path)
-      (string/join "." ref-path)
-      (let [field (first field-path)
-            field-path' (next field-path)]
-        (when (and (not field-path')
-                   (= "reference" (:type field)))
-          (throw (IllegalArgumentException. "Invalid field path")))
-        (let [ref (if (= "reference" (:type field))
-                    (:relationshipName field)
-                    (:name field))]
-          (recur (conj ref-path ref)
-                 field-path'))))))
+(t/defprotocol SoqlValue
+  (soql-value [_] :- t/Str))
 
-;; TODO some support for WHERE clauses, obviously
+;; TODO figure out how to annotate these impls
+(extend-protocol SoqlValue
+  String
+  (soql-value [s]
+    (str "'" (string/replace s #"'" "\\'") "'"))
+  clojure.lang.IPersistentSet
+  (soql-value [xs]
+    (str "(" (string/join "," (map soql-value xs)) ")"))
+  clojure.lang.IPersistentVector
+  (soql-value [fields]
+    (loop [refs []
+           fields fields]
+      (if-not (seq fields)
+        (string/join "." refs)
+        (let [field (first fields)
+              fields' (next fields)]
+          (when (and (not fields')
+                     (= "reference" (:type field)))
+            (throw (IllegalArgumentException. "Invalid field path")))
+          (let [ref (if (= "reference" (:type field))
+                      (:relationshipName field)
+                      (:name field))]
+            (recur (conj refs ref)
+                   fields')))))))
+
+(t/defalias WhereOp
+  "Operators allowed in where clauses"
+  (t/U ':in ':=))
+
+(t/defalias WhereSimpleValue
+  (t/U t/Str))
+
+(t/defalias WhereValue
+  (t/U WhereSimpleValue (t/Set WhereSimpleValue) FieldPath))
+
+(t/defalias WhereClause
+  '[WhereOp WhereValue WhereValue])
+
+(t/ann ^:no-check soql-where
+       [WhereClause -> t/Str])
+(defn soql-where
+  [[op lh rh]]
+  ;; TODO the type of op is significant
+  (str "(" (soql-value lh) " " (name op) " " (soql-value rh) ")"))
+
 (t/ann ^:no-check soql-query
-       [sf/SalesforceClient t/Keyword (t/Vec (t/Vec sf/SalesforceFieldDescription)) -> t/Str])
+       [sf/SalesforceClient t/Keyword (t/NonEmptyVec FieldPath) (t/Vec WhereClause) -> t/Str])
 (defn soql-query
   "Creates a soql query string for the given client, type, and seq of field
    paths"
-  [client type field-paths]
+  [client type field-paths where]
   (let [description (get-type-description client type)
-        soql-fields (map soql-field field-paths)]
+        soql-fields (map soql-value field-paths)]
     (str "SELECT " (string/join "," soql-fields)
-         " FROM " (:name description))))
+         " FROM " (:name description)
+         (when (seq where)
+           (str " WHERE "
+                (string/join " AND " (map soql-where where)))))))
 
-(t/ann ^:no-check resolve-record-path
-       [(t/Vec sf/SalesforceFieldDescription) -> (t/Vec t/Keyword)])
-(defn resolve-record-path
+(t/ann ^:no-check resolve-field-path
+       [FieldPath -> AttrPath])
+(defn resolve-field-path
   "Derives a seq of record keys for the given seq of fields, suitable for
    applying to the result of the underlying query! fn"
   [field-path]
@@ -211,22 +277,23 @@
                  field-path'))))))
 
 (t/ann ^:no-check query-attr-paths
-       [sf/SalesforceClient t/Keyword (t/Vec (t/Vec t/Keyword)) -> (t/Vec t/Any)])
+       [sf/SalesforceClient t/Keyword (t/NonEmptyVec AttrPath) (t/Vec WhereClause) -> (t/Vec t/Any)])
 (defn query-attr-paths
   "Queries the given client and type for the given seq of attr-paths, e.g.
    [[:account :name] [:account :createdby :lastname]]. This returns a vector
    of maps with keyword paths matching each of the attr-paths, e.g.
    {:account {:name ... :createdby {:lastname ...}}}. The base type will also
    have metadata with a :url resolvable by the current client."
-  [client type attr-paths]
+  [client type attr-paths where]
   (let [field-paths (mapv (partial resolve-attr-path client type) attr-paths)
-        soql (soql-query client type field-paths)
+        where (mapv #(update % 1 (fn [path] (resolve-attr-path client (first path) (rest path)))) where)
+        soql (soql-query client type field-paths where)
         records (sf/query! client soql)]
     (mapv (fn [record]
             (let [url (get-in record [:attributes :url])]
               (with-meta
                 (reduce (fn [record' [field-path attr-path]]
-                          (let [record-path (resolve-record-path field-path)
+                          (let [record-path (resolve-field-path field-path)
                                 value (get-in record record-path)
                                 field (last field-path)]
                             (cond-> record'
@@ -242,7 +309,7 @@
          (t/HVec [t/Keyword (t/U t/Keyword v) *])))
 
 (t/ann ^:no-check expand-variants
-       [Variant -> (t/Vec (t/Vec t/Keyword))])
+       [Variant -> (t/Vec AttrPath)])
 (defn expand-variants
   "Expands a variant path into a seq of attr paths"
   [variant-path]
@@ -256,6 +323,7 @@
 
 (t/defalias Query
   (t/HMap :mandatory {:find Variant}
+          :optional {:where (t/Vec WhereClause)}
           :complete? true))
 
 (t/ann ^:no-check query
@@ -273,4 +341,4 @@
       (let [type (ffirst attr-paths)]
         (mapv (fn [record]
                 {type record})
-              (query-attr-paths client type (map next attr-paths)))))))
+              (query-attr-paths client type (map next attr-paths) (:where query)))))))

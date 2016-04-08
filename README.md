@@ -6,7 +6,7 @@ version detection.
 
 ## Installation
 
-`sparkfund/sails-forth 0.1.5`
+`sparkfund/sails-forth 0.1.6`
 
 ## Usage
 
@@ -44,6 +44,9 @@ Dates and datetimes will become joda localdates and dates, respectively.
 (require '[sails-forth.query as sq])
 
 (sq/query client {:find [:contact :id :first-name :last-name]})
+(sq/query client {:find [:contact :id :first-name :last-name [:faction :id :name]]})
+(sq/query client {:find [:contact :id :first-name :last-name]
+                  :where [[:= :last-name "Organa"]]})
 ```
 
 ## Configuration

@@ -1,3 +1,8 @@
+## 0.1.6
+
+* Fix bug in resolving field paths for custom relations
+* Add :where clause support to query
+
 ## 0.1.5
 
 * Fix bug in field description type
