@@ -1,3 +1,7 @@
+## 0.1.7
+
+* Use ex-info for exceptions to provide better data
+
 ## 0.1.6
 
 * Fix bug in resolving field paths for custom relations

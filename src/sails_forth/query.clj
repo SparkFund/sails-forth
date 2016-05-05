@@ -49,7 +49,7 @@
     (when (or (not= "reference" type)
               (not (and (= 1 (count referenceTo))
                         (string? (first referenceTo)))))
-      (throw (IllegalArgumentException. "Invalid reference field")))
+      (throw (ex-info "Invalid reference field" {:field field})))
     (-> referenceTo
         first
         (string/replace #"__c\Z" "")
@@ -187,7 +187,8 @@
             field (get-field-description client type attr)
             attr-path' (next attr-path)]
         (when-not field
-          (throw (IllegalArgumentException. "Invalid attr path")))
+          (throw (ex-info "Invalid attr path" {:attr-path attr-path
+                                               :type type})))
         (recur (when attr-path'
                  (field->refers-attr field))
                attr-path'
@@ -214,7 +215,8 @@
               fields' (next fields)]
           (when (and (not fields')
                      (= "reference" (:type field)))
-            (throw (IllegalArgumentException. "Invalid field path")))
+            (throw (ex-info "Invalid field path"
+                            {:field-path fields})))
           (let [ref (if (= "reference" (:type field))
                       (:relationshipName field)
                       (:name field))]
@@ -269,7 +271,8 @@
             field-path' (next field-path)]
         (when (and (not field-path')
                    (= "reference" (:type field)))
-          (throw (IllegalArgumentException. "Invalid field path")))
+          (throw (ex-info "Invalid field path"
+                          {:field-path field-path})))
         (let [record-key (keyword (if (= "reference" (:type field))
                                     (:relationshipName field)
                                     (:name field)))]
