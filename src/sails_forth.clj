@@ -330,117 +330,20 @@
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
-(t/defalias SalesforcePicklistValue
-  (t/HMap :mandatory {:active t/Bool
-                      :defaultValue t/Bool
-                      :label (t/Option t/Str)
-                      :validFor t/Any
-                      :value t/Str}))
-
 (t/defalias SalesforceFieldDescription
-  (t/HMap :mandatory {:createable t/Bool
-                      :mask t/Any
-                      :nameField t/Bool
-                      :deprecatedAndHidden t/Bool
-                      :unique t/Bool
-                      :dependentPicklist t/Bool
-                      :soapType t/Str
-                      :cascadeDelete t/Bool
-                      :htmlFormatted t/Bool
-                      :restrictedDelete t/Bool
-                      :scale t/AnyInteger
-                      :calculated t/Bool
-                      :name t/Str
-                      :byteLength t/AnyInteger
-                      :highScaleNumber t/Bool
-                      :precision t/AnyInteger
-                      :filterable t/Bool
-                      :digits t/AnyInteger
+  (t/HMap :mandatory {:name t/Str
                       :type t/Str
-                      :custom t/Bool
-                      :restrictedPicklist t/Bool
-                      :idLookup t/Bool
-                      :picklistValues (t/Vec SalesforcePicklistValue)
-                      :referenceTargetField t/Any
-                      :defaultedOnCreate t/Bool
-                      :externalId t/Bool
-                      :controllerName t/Any
-                      :inlineHelpText t/Any
-                      :label t/Str
-                      :defaultValueFormula t/Any
-                      :sortable t/Bool
-                      :namePointing t/Bool
-                      :updateable t/Bool
-                      :length t/AnyInteger
-                      :caseSensitive t/Bool
-                      :nillable t/Bool
                       :referenceTo (t/Vec t/Str)
-                      :displayLocationInDecimal t/Bool
-                      :writeRequiresMasterRead t/Bool
-                      :calculatedFormula t/Any
-                      :defaultValue t/Any
-                      :permissionable t/Bool
-                      :extraTypeInfo t/Any
-                      :relationshipOrder t/Any
-                      :encrypted t/Bool
-                      :filteredLookupInfo t/Any
-                      :autoNumber t/Bool
-                      :relationshipName t/Any
-                      :queryByDistance t/Bool
-                      :maskType t/Any
-                      :groupable t/Bool}))
-
-(t/defalias SalesforceRecordTypeInfo
-  (t/HMap :mandatory {:available t/Bool
-                      :defaultRecordTypeMapping t/Bool
-                      :master t/Bool
-                      :name t/Str
-                      :recordTypeId SalesforceId
-                      :urls (t/Map t/Keyword HttpUrl)}))
-
-(t/defalias SalesforceChildRelationship
-  (t/HMap :mandatory {:cascadeDelete t/Bool
-                      :childSObject t/Str
-                      :deprecatedAndHidden t/Bool
-                      :field t/Str
-                      :junctionIdListName t/Any
-                      :junctionReferenceTo (t/Vec t/Any)
-                      :relationshipName (t/Option t/Str)
-                      :restrictedDelete t/Bool}))
+                      :scale t/AnyInteger
+                      :precision t/AnyInteger
+                      :label t/Str
+                      :relationshipName t/Any}))
 
 (t/defalias SalesforceObjectDescription
-  (t/HMap :mandatory {:mergeable t/Bool
-                      :deletable t/Bool
-                      :createable t/Bool
-                      :searchLayoutable t/Bool
-                      :supportedScopes t/Any
-                      :listviewable t/Any
-                      :deprecatedAndHidden t/Bool
-                      :urls (t/Map t/Keyword HttpUrl)
-                      :namedLayoutInfos (t/Vec t/Any)
-                      :labelPlural t/Str
-                      :feedEnabled t/Bool
-                      :name t/Str
-                      :retrieveable t/Bool
-                      :fields (t/Vec SalesforceFieldDescription)
-                      :layoutable t/Bool
-                      :triggerable t/Bool
-                      :childRelationships (t/Vec SalesforceChildRelationship)
-                      :actionOverrides (t/Vec t/Any)
-                      :custom t/Bool
-                      :searchable t/Bool
-                      :activateable t/Bool
-                      :keyPrefix t/Str
-                      :undeletable t/Bool
+  (t/HMap :mandatory {:name t/Str
                       :label t/Str
-                      :customSetting t/Bool
-                      :updateable t/Bool
-                      :recordTypeInfos (t/Vec SalesforceRecordTypeInfo)
-                      :replicateable t/Bool
-                      :networkScopeFieldName t/Any
-                      :lookupLayoutable t/Any
-                      :compactLayoutable t/Bool
-                      :queryable t/Bool}))
+                      :custom t/Bool
+                      :fields (t/Vec SalesforceFieldDescription)}))
 
 (t/defn describe!
   [client :- SalesforceClient
@@ -461,32 +364,12 @@
             (throw (ex-info message data))))))
 
 (t/defalias SalesforceObjectOverview
-  (t/HMap :mandatory {:mergeable t/Bool
-                      :deletable t/Bool
-                      :createable t/Bool
-                      :deprecatedAndHidden t/Bool
-                      :urls (t/Map t/Keyword HttpUrl)
-                      :labelPlural t/Str
-                      :feedEnabled t/Bool
-                      :name t/Str
-                      :retrieveable t/Bool
-                      :triggerable t/Bool
-                      :layoutable t/Bool
-                      :custom t/Bool
-                      :searchable t/Bool
-                      :activateable t/Bool
-                      :keyPrefix (t/Option t/Str)
-                      :undeletable t/Bool
+  (t/HMap :mandatory {:name t/Str
                       :label t/Str
-                      :customSetting t/Bool
-                      :updateable t/Bool
-                      :replicateable t/Bool
-                      :queryable t/Bool}))
+                      :custom t/Bool}))
 
 (t/defalias SalesforceObjectsOverview
-  (t/HMap :mandatory {:encoding t/Str
-                      :maxBatchSize t/AnyInteger
-                      :sobjects (t/Vec SalesforceObjectOverview)}))
+  (t/HMap :mandatory {:sobjects (t/Vec SalesforceObjectOverview)}))
 
 (t/defn objects!
   [client :- SalesforceClient] :- SalesforceObjectsOverview

@@ -1,3 +1,7 @@
+## 0.2.0
+
+* Relax salesforce types
+
 ## 0.1.7
 
 * Use ex-info for exceptions to provide better data
