@@ -1,4 +1,4 @@
-(defproject sparkfund/sails-forth "0.1.7"
+(defproject sparkfund/sails-forth "0.2.0"
   :description "A mostly-typed salesforce library"
   :url "http://github.com/sparkfund/sails-forth"
   :license {:name "Eclipse Public License"
