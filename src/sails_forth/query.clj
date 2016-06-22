@@ -225,7 +225,7 @@
 
 (t/defalias WhereOp
   "Operators allowed in where clauses"
-  (t/U ':in ':=))
+  (t/U ':in ':= ':or))
 
 (t/defalias WhereSimpleValue
   (t/U t/Str))
@@ -236,12 +236,23 @@
 (t/defalias WhereClause
   '[WhereOp WhereValue WhereValue])
 
+(declare soql-where*)
+
 (t/ann ^:no-check soql-where
        [WhereClause -> t/Str])
 (defn soql-where
-  [[op lh rh]]
+  [[op & args]]
   ;; TODO the type of op is significant
-  (str "(" (soql-value lh) " " (name op) " " (soql-value rh) ")"))
+  (case op
+    :or (str "(" (string/join ") OR (" (map soql-where* args)) ")")
+    (let [[lh rh] args]
+      (str "(" (soql-value lh) " " (name op) " " (soql-value rh) ")"))))
+
+(t/ann ^:no-check soql-where*
+       [(t/Seqable WhereClause) -> t/Str])
+(defn soql-where*
+  [where*]
+  (string/join " AND " (map soql-where where*)))
 
 (t/ann ^:no-check soql-query
        [sf/SalesforceClient t/Keyword (t/NonEmptyVec FieldPath) (t/Vec WhereClause) -> t/Str])
@@ -254,8 +265,7 @@
     (str "SELECT " (string/join "," soql-fields)
          " FROM " (:name description)
          (when (seq where)
-           (str " WHERE "
-                (string/join " AND " (map soql-where where)))))))
+           (str " WHERE " (soql-where* where))))))
 
 (t/ann ^:no-check resolve-field-path
        [FieldPath -> AttrPath])
@@ -279,6 +289,13 @@
           (recur (conj record-path record-key)
                  field-path'))))))
 
+(defn update-attr-path [client where]
+  (mapv (fn [[op & args :as clause]]
+          (case op
+            :or `[:or ~@(map (partial update-attr-path client) args)]
+            (update clause 1 (fn [path] (resolve-attr-path client (first path) (rest path))))))
+        where))
+
 (t/ann ^:no-check query-attr-paths
        [sf/SalesforceClient t/Keyword (t/NonEmptyVec AttrPath) (t/Vec WhereClause) -> (t/Vec t/Any)])
 (defn query-attr-paths
@@ -289,7 +306,7 @@
    have metadata with a :url resolvable by the current client."
   [client type attr-paths where]
   (let [field-paths (mapv (partial resolve-attr-path client type) attr-paths)
-        where (mapv #(update % 1 (fn [path] (resolve-attr-path client (first path) (rest path)))) where)
+        where (update-attr-path client where)
         soql (soql-query client type field-paths where)
         records (sf/query! client soql)]
     (mapv (fn [record]
