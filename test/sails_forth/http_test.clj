@@ -1,19 +1,11 @@
-(ns sails-forth-test
+(ns sails-forth.http-test
   (:require [clojure.core.typed :as t]
-            [clojure.edn :as edn]
             [clojure.test :refer :all]
-            [sails-forth :refer :all]))
-
-(deftest test-types
-  (t/check-ns 'sails-forth))
-
-(defn load-config
-  []
-  (some-> (try (slurp "test/config.edn") (catch Exception _))
-          edn/read-string))
+            [sails-forth.http :refer :all]
+            [sails-forth.test :as test]))
 
 (deftest ^:integration test-client
-  (let [config (load-config)]
+  (let [config (test/load-config)]
     (when-not config
       (throw (Exception. "Salesforce tests require a config")))
     (when-not (:sandbox? config)

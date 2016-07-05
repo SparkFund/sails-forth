@@ -5,7 +5,7 @@
             [clj-time.format :as tf]
             [clojure.core.typed :as t]
             [clojure.string :as string]
-            [sails-forth :as sf]))
+            [sails-forth.client :as sf]))
 
 (t/defalias Attr
   "An Attr is a keyword that refers to a Salesforce object or field"
@@ -87,14 +87,14 @@
 (defn get-types
   "Obtains a map of descriptions by type"
   [client]
-  (if-let [types (get-in @client [::types])]
+  (if-let [types (sf/get! (sf/cache client) ::types)]
     types
     (let [objects (sf/objects! client)
           {:keys [sobjects]} objects
           type->object (->> sobjects
                             (map (juxt object->attr identity))
                             set-map)]
-      (swap! client (fn [state] (assoc state ::types type->object)))
+      (sf/put! (sf/cache client) ::types type->object)
       type->object)))
 
 (t/ann ^:no-check get-type-description
@@ -103,30 +103,31 @@
   "Obtains the description for a given type and builds some custom indexes
    into it. This will only fetch the type once for a given client."
   [client type]
-  (when-let [overview (type (get-types client))]
-    (if (:fields overview)
-      overview
-      (when-let [description (sf/describe! client (:name overview))]
-        (let [{:keys [fields]} description
-              attr->field (->> fields
-                               (map (juxt field->attr identity))
-                               set-map)
-              field-index (->> fields
-                               (map (juxt (comp keyword :name) identity))
-                               set-map)
-              label-index (reduce (fn [accum field]
-                                    (let [attr (field->attr field)
-                                          {:keys [label]} field]
-                                      (update accum label (fnil conj #{}) attr)))
-                                  {}
-                                  fields)
-              description (assoc description
-                                 ::attr->field attr->field
-                                 ::field-index field-index
-                                 ::label-index label-index)]
-          (swap! client (fn [state]
-                          (assoc-in state [::types type] description)))
-          description)))))
+  (let [types (get-types client)]
+    (when-let [overview (type types)]
+      (if (:fields overview)
+        overview
+        (when-let [description (sf/describe! client (:name overview))]
+          (let [{:keys [fields]} description
+                attr->field (->> fields
+                                 (map (juxt field->attr identity))
+                                 set-map)
+                field-index (->> fields
+                                 (map (juxt (comp keyword :name) identity))
+                                 set-map)
+                label-index (reduce (fn [accum field]
+                                      (let [attr (field->attr field)
+                                            {:keys [label]} field]
+                                        (update accum label (fnil conj #{}) attr)))
+                                    {}
+                                    fields)
+                description (assoc description
+                                   ::attr->field attr->field
+                                   ::field-index field-index
+                                   ::label-index label-index)
+                updated (merge overview description)]
+            (sf/put! (sf/cache client) ::types (assoc types type updated))
+            updated))))))
 
 (t/ann ^:no-check get-fields
        [sf/SalesforceClient Attr -> (t/Option (t/Map Attr sf/SalesforceFieldDescription))])
@@ -214,4 +215,3 @@
                                     (:name field)))]
           (recur (conj record-path record-key)
                  field-path'))))))
-

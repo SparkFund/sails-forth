@@ -2,7 +2,7 @@
   "Provides for executing queries using more idiomatic clojure forms"
   (:require [clojure.core.typed :as t]
             [clojure.string :as string]
-            [sails-forth :as sf]
+            [sails-forth.client :as sf]
             [sails-forth.clojurify :refer :all]))
 
 (t/defprotocol SoqlValue
