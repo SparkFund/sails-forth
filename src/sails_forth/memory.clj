@@ -222,3 +222,7 @@
 (defn count!
   [astate soql]
   (count (query! astate soql)))
+
+(defn limits!
+  [astate]
+  {})

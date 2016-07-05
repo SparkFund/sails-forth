@@ -98,5 +98,7 @@
         (memory/query! client query))
       (count! [_ query]
         (memory/count! client query))
+      (limits! [_]
+        (memory/limits! client))
       (cache [_]
         cache))))
