@@ -1,3 +1,13 @@
+## 0.3.0
+
+* Refactor client behind a protocol
+* Add memory client to facilitate testing
+* Deprecate top-level ns to make emacs clojure-mode happy
+
+## 0.2.1
+
+* Add update! fn
+
 ## 0.2.0
 
 * Relax salesforce types
