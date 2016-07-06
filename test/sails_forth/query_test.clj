@@ -2,23 +2,20 @@
   (:require [clj-time.core :as time]
             [clojure.core.typed :as t]
             [clojure.test :refer :all]
-            [sails-forth :as sf]
-            [sails-forth-test :as sft]
+            [sails-forth.client :as sf]
+            [sails-forth.clojurify :refer :all]
             [sails-forth.query :refer :all]
-            [sails-forth.clojurify :refer :all]))
+            [sails-forth.test :as test]))
 
 ;;; NOTE these tests are not guaranteed to work on arbitrary salesforce dbs
 
-(deftest test-types
-  #_(t/check-ns 'sails-forth.query))
-
-(deftest test-soql-query
-  (let [client (sf/build-client! (sft/load-config))]
+(deftest ^:integration test-soql-query
+  (let [client (sf/build-http-client (test/load-config))]
     (is (= "SELECT Id FROM Opportunity"
            (soql-query client :opportunity [(resolve-attr-path client :opportunity [:id])] [])))))
 
-(deftest test-query
-  (let [client (sf/build-client! (sft/load-config))]
+(deftest ^:integration test-query
+  (let [client (sf/build-http-client (test/load-config))]
     (is (query client {:find [:payment
                               :id
                               [:opportunity :id]

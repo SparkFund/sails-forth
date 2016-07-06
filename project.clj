@@ -1,4 +1,4 @@
-(defproject sparkfund/sails-forth "0.2.1"
+(defproject sparkfund/sails-forth "0.3.0"
   :description "A mostly-typed salesforce library"
   :url "http://github.com/sparkfund/sails-forth"
   :license {:name "Eclipse Public License"
@@ -6,6 +6,7 @@
   :dependencies [[cheshire "5.5.0"]
                  [clj-http "2.0.0"]
                  [clj-time "0.11.0"]
+                 [com.github.jsqlparser/jsqlparser "0.9.5"]
                  [org.clojure/clojure "1.7.0"]
                  [org.clojure/core.typed "0.3.18"]]
   :repl-options {:init-ns sails-forth.repl}
