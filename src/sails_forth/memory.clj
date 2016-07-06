@@ -1,7 +1,8 @@
 (ns sails-forth.memory
   (:require [clojure.set :as set]
             [clojure.string :as string])
-  (:import [net.sf.jsqlparser.parser CCJSqlParserUtil])
+  (:import [net.sf.jsqlparser.parser CCJSqlParserUtil]
+           [org.joda.time DateTime LocalDate])
   (:refer-clojure :exclude [update list]))
 
 (defn build-state
@@ -32,6 +33,14 @@
   (case type
     "string"
     (string? value)
+    "datetime"
+    (instance? DateTime value)
+    "date"
+    (instance? LocalDate value)
+    "double"
+    (number? value)
+    "int"
+    (integer? value)
     (let [{:keys [objects]} state]
       (contains? (objects type) value))))
 
@@ -184,12 +193,7 @@
         path-type (type-schema (first path))]
     (when-not path-type
       (throw (ex-info "invalid path" {:type type :path path})))
-    (case path-type
-      "string"
-      (do
-        (when (next path)
-          (throw (ex-info "invalid path" {:type type :path path})))
-        (select-keys object [(first path)]))
+    (if (keyword? path-type)
       (do
         (when-not (next path)
           (throw (ex-info "invalid path" {:type type :path path})))
@@ -197,7 +201,11 @@
           (let [object' (assoc (get-in objects [path-type id]) :id id)]
             {(first path)
              (project state path-type object' (next path))})
-          {})))))
+          {}))
+      (do
+        (when (next path)
+          (throw (ex-info "invalid path" {:type type :path path})))
+        (select-keys object [(first path)])))))
 
 (defn deep-merge
   [& maps]
