@@ -1,11 +1,10 @@
 (ns sails-forth
-  (:require [sails-forth.client :as client]
-            [sails-forth.http :as http]))
+  (:require [sails-forth.client :as client]))
 
 (defn build-client!
   {:deprecated "0.3"}
   [config]
-  (http/build-client! config))
+  (client/build-http-client config))
 
 (defn create!
   {:deprecated "0.3"}

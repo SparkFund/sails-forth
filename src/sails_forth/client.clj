@@ -44,17 +44,18 @@
    "Returns a persistent cache"))
 
 (defn build-atomic-cache
-  [atom]
-  (reify Cache
-    (put! [_ key value]
-      (swap! atom assoc-in [::cache key] value))
-    (get! [_ key]
-      (get-in @atom [::cache key]))))
+  []
+  (let [state (atom {})]
+    (reify Cache
+      (put! [_ key value]
+        (swap! state assoc-in [::cache key] value))
+      (get! [_ key]
+        (get-in @state [::cache key])))))
 
 (defn build-http-client
   [config]
   (let [client (http/build-client! config)
-        cache (build-atomic-cache client)]
+        cache (build-atomic-cache)]
     (reify Client
       (create! [_ type attrs]
         (http/create! client type attrs))
@@ -80,7 +81,7 @@
 (defn build-memory-client
   [schema]
   (let [client (memory/create-state! schema)
-        cache (build-atomic-cache client)]
+        cache (build-atomic-cache)]
     (reify Client
       (create! [_ type attrs]
         (memory/create! client type attrs))
