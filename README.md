@@ -6,12 +6,12 @@ version detection.
 
 ## Installation
 
-`sparkfund/sails-forth 0.3.0`
+`sparkfund/sails-forth 0.3.1`
 
 ## Usage
 
 ``` clojure
-(require '[sails-forth :as sf])
+(require '[sails-forth.client :as sf])
 
 (def config
   {:username "..."
@@ -21,9 +21,9 @@ version detection.
    :consumer-secret "..."
    :sandbox? false})
 
-(def client (sf/build-client config))
+(def client (sf/build-http-client config))
 
-(sf/request! client :get "/limits" {})
+(sf/limits! client {})
 
 (def object-id
   (sf/create! client "contact" {:first_name "Spark" :last_name "Fund"}))
@@ -47,6 +47,17 @@ Dates and datetimes will become joda localdates and dates, respectively.
 (sq/query client {:find [:contact :id :first-name :last-name [:faction :id :name]]})
 (sq/query client {:find [:contact :id :first-name :last-name]
                   :where [[:= :last-name "Organa"]]})
+```
+
+There is a memory client that operates on a schema and provides working impls of
+all of the client fns. The query fn is limited to a subset of the soql operators,
+including =, AND, OR, and IN, though adding support for more operators is very
+straightforward.
+
+``` clojure
+(require '[sails-forth.clojurify :as sc])
+
+(def mc (sf/build-memory-client (sc/schema client #{:contact})))
 ```
 
 ## Configuration
