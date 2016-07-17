@@ -167,10 +167,10 @@
 
 (extend-protocol Renderer
   net.sf.jsqlparser.schema.Column
-  (render [column object]
+  (render [column projection]
     ;; TODO this assumes all where paths are found in the select clause
     (let [path (mapv keyword (string/split (str column) #"\."))]
-      (get-in object path)))
+      (get-in projection path)))
   net.sf.jsqlparser.expression.LongValue
   (render [value _]
     (.getValue value))
