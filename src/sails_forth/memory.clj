@@ -189,7 +189,6 @@
 
 (defn project
   [state type object path]
-  (when (= type "User"))
   (let [{:keys [schema objects]} state
         type-schema (type-schema schema type)
         fields (->> (:fields type-schema)
