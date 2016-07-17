@@ -42,6 +42,10 @@
       (string? value)
       "string"
       (string? value)
+      "textarea"
+      (string? value)
+      "url"
+      (string? value)
       "datetime"
       (instance? DateTime value)
       "date"
@@ -55,7 +59,13 @@
       "int"
       (integer? value)
       "picklist"
+      (string? value) ;; use the set of allowed values
+      "multipicklist"
+      (string? value) ;; TODO how is this materialized
+      "phone"
       (string? value)
+      "boolean"
+      (#{true false} value)
       "reference"
       (let [type (first (:referenceTo field))]
         (object-exists? state type value))
