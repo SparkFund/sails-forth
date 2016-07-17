@@ -57,7 +57,8 @@
       "picklist"
       (string? value)
       "reference"
-      value ; TODO validate object exists
+      (let [type (first (:referenceTo field))]
+        (object-exists? state type value))
       (throw (ex-info "Unknown field type" {:field field})))))
 
 (defn validate-attrs

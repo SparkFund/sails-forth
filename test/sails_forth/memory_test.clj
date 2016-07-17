@@ -35,20 +35,7 @@
                                            "where Amount__c = 0")))))
       (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}
                :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
-             (sf/query! client (str "select Amount__c,CreatedBy.Name from Payment__c")))))
-    #_(do
-      (sf/create! client "opportunity" {:name "foo"})
-      (sf/create! client "opportunity" {:name "bar"})
-      (sf/create! client "opportunity" {:name "baz"})
-      (sf/delete! client "opportunity" 2)
-      (sf/update! client "opportunity" 3 {:name "qat"})
-      (is (= [{:id 1 :name "foo"} {:id 3 :name "qat"}]
-             (sf/list! client "opportunity")))
-      (is (= [{:id 3 :name "qat"}]
-             (sf/query! client (str "select id, name from opportunity "
-                                    "where name = 'qat'"))))
-      (sf/create! client "payment" {:name "foo 1" :opportunity 1})
-      (is (= [{:opportunity {:name "foo"}}]
-             (sf/query! client "select opportunity.name from payment")))
-      (is (= [{:payment {:name "foo 1" :opportunity {:name "foo"}}}]
-             (sq/query client {:find [:payment :name [:opportunity :name]]}))))))
+             (sf/query! client (str "select Amount__c,CreatedBy.Name from Payment__c"))))
+      (is (= 1 (sf/count! client "select Amount__c from Payment__c"))))
+    (testing "limits"
+      (is (= {} (sf/limits! client))))))
