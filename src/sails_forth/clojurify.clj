@@ -219,7 +219,7 @@
 (defn schema
   [client types]
   (let [type-attrs #{:name :label :custom :fields}
-        field-attrs #{:name :type :referenceTo :scale :precision :label :relationshipName}
+        field-attrs #{:name :type :referenceTo :scale :precision :label :relationshipName :picklistValues}
         all-types (get-types client)]
     (into {}
           (for [type types]

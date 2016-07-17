@@ -36,7 +36,11 @@
 
 (defn validate-attr
   [state field value]
-  (let [{:keys [type]} field]
+  (let [{:keys [type]} field
+        picklist-values (->> (:picklistValues field)
+                             (filter :active)
+                             (map :value)
+                             (into #{}))]
     (case type
       "id"
       (string? value)
@@ -59,9 +63,10 @@
       "int"
       (integer? value)
       "picklist"
-      (string? value) ;; use the set of allowed values
+      (contains? picklist-values value)
       "multipicklist"
-      (string? value) ;; TODO how is this materialized
+      (let [all-values (string/split value #";")]
+        (every? (partial contains? picklist-values) all-values))
       "phone"
       (string? value)
       "boolean"
