@@ -28,6 +28,8 @@ version detection.
 (def object-id
   (sf/create! client "contact" {:first_name "Spark" :last_name "Fund"}))
 
+(sf/update! client "contact object-id {:last_name "Fondue"})
+
 (sf/delete! client "contact" object-id)
 
 (sf/query! client "select First_Name, Last_Name from contact__c")
