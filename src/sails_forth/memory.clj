@@ -1,13 +1,15 @@
 (ns sails-forth.memory
   (:require [clojure.set :as set]
-            [clojure.string :as string])
-  (:import [net.sf.jsqlparser.parser CCJSqlParserUtil]
+            [clojure.string :as string]
+            [clojure.walk :as walk])
+  (:import [java.util UUID]
+           [net.sf.jsqlparser.parser CCJSqlParserUtil]
            [org.joda.time DateTime LocalDate])
   (:refer-clojure :exclude [update list]))
 
 (defn build-state
   [schema]
-  {:last-id 0
+  {:last-id nil
    :objects {}
    :schema schema})
 
@@ -22,50 +24,84 @@
       (throw (ex-info "invalid type" {:type type})))
     type-schema))
 
-(defn validate-existence
+(defn object-exists?
   [state type id]
   (let [{:keys [objects]} state]
-    (when-not (get-in objects [type id])
-      (throw (ex-info "object not found" {:type type :id id})))))
+    (get-in objects [type id])))
+
+(defn validate-existence
+  [state type id]
+  (when-not (object-exists? state type id)
+    (throw (ex-info "object not found" {:type type :id id}))))
 
 (defn validate-attr
-  [state type value]
-  (case type
-    "string"
-    (string? value)
-    "datetime"
-    (instance? DateTime value)
-    "date"
-    (instance? LocalDate value)
-    "double"
-    (number? value)
-    "int"
-    (integer? value)
-    (let [{:keys [objects]} state]
-      (contains? (objects type) value))))
+  [state field value]
+  (let [{:keys [type]} field
+        picklist-values (->> (:picklistValues field)
+                             (filter :active)
+                             (map :value)
+                             (into #{}))]
+    (case type
+      "id"
+      (string? value)
+      "string"
+      (string? value)
+      "textarea"
+      (string? value)
+      "url"
+      (string? value)
+      "datetime"
+      (instance? DateTime value)
+      "date"
+      (instance? LocalDate value)
+      "double"
+      (number? value)
+      "currency"
+      (number? value)
+      "percent"
+      (number? value)
+      "int"
+      (integer? value)
+      "picklist"
+      (contains? picklist-values value)
+      "multipicklist"
+      (let [all-values (string/split value #";")]
+        (every? (partial contains? picklist-values) all-values))
+      "phone"
+      (string? value)
+      "boolean"
+      (#{true false} value)
+      "reference"
+      (let [type (first (:referenceTo field))]
+        (object-exists? state type value))
+      (throw (ex-info "Unknown field type" {:field field})))))
 
 (defn validate-attrs
   [state type attrs]
   (let [{:keys [schema]} state
-        type-schema (type-schema schema type)]
-    (when (or (seq (set/difference (set (keys attrs)) (set (keys type-schema))))
+        type-schema (type-schema schema type)
+        {:keys [fields]} type-schema
+        fields (into {} (map (juxt :name identity) fields))]
+    (when (or (seq (set/difference (set (keys attrs)) (set (keys fields))))
               (not (every? (fn [[attr value]]
-                             (validate-attr state (type-schema attr) value))
+                             (let [field (get fields attr)]
+                               (validate-attr state field value)))
                            attrs)))
       (throw (ex-info "invalid attrs" {:attrs attrs})))))
 
 (defn create
   [state type attrs]
-  (let [{:keys [schema objects last-id]} state
-        id (inc last-id)]
-    (validate-attrs state type attrs)
+  (let [{:keys [schema objects]} state
+        id (str (UUID/randomUUID))
+        attrs' (assoc attrs "Id" id)]
+    (validate-attrs state type attrs')
     (-> state
         (assoc :last-id id)
-        (assoc-in [:objects type id] attrs))))
+        (assoc-in [:objects type id] attrs'))))
 
 (defn create!
-  [astate stype attrs]
-  (:last-id (swap! astate create (keyword stype) attrs)))
+  [astate type attrs]
+  (:last-id (swap! astate create type attrs)))
 
 (defn delete
   [state type id]
@@ -73,62 +109,44 @@
   (update-in state [:objects type] dissoc id))
 
 (defn delete!
-  [astate stype id]
-  (swap! astate delete (keyword stype) id)
+  [astate type id]
+  (swap! astate delete type id)
   true)
 
-(defn update
+(defn update-object
   [state type id attrs]
   (validate-existence state type id)
   (let [old (get-in state [:objects type id])
         new (merge old attrs)]
     (validate-attrs state type new)
-    (assoc-in state [:objects type id] attrs)))
+    (assoc-in state [:objects type id] new)))
 
 (defn update!
-  [astate stype id attrs]
-  (swap! astate update (keyword stype) id attrs)
+  [astate type id attrs]
+  (swap! astate update-object type id attrs)
   true)
 
 (defn list
   [state type]
-  (->> (get-in state [:objects type])
-       (map (fn [[id attrs]]
-              (assoc attrs :id id)))
-       (into [])))
+  (into [] (vals (get-in state [:objects type]))))
 
 (defn list!
-  [astate stype]
-  (list @astate (keyword stype)))
+  [astate type]
+  (list @astate type))
 
 (defn describe
   [state type]
-  (let [{:keys [schema]} state
-        type-schema (assoc (type-schema schema type)
-                           :id "string")]
-    {:name (name type)
-     :fields (mapv (fn [[attr type]]
-                     (let [type' (if (string? type)
-                                   type
-                                   "reference")]
-                       (cond-> {:name (name attr)
-                                :label (name attr)
-                                :type type'}
-                         (= type' "reference")
-                         (assoc :referenceTo [(name type)]
-                                :relationshipName (name type)))))
-                   type-schema)}))
+  (let [{:keys [schema]} state]
+    (type-schema schema type)))
 
 (defn describe!
   [astate stype]
-  (describe @astate (keyword stype)))
+  (describe @astate stype))
 
 (defn objects
   [state]
   (let [{:keys [schema]} state]
-    {:sobjects (mapv (fn [type]
-                       {:name (name type)})
-                     (keys schema))}))
+    {:sobjects (mapv #(dissoc % :fields) (vals schema))}))
 
 (defn objects!
   [astate]
@@ -164,10 +182,10 @@
 
 (extend-protocol Renderer
   net.sf.jsqlparser.schema.Column
-  (render [column object]
+  (render [column projection]
     ;; TODO this assumes all where paths are found in the select clause
     (let [path (mapv keyword (string/split (str column) #"\."))]
-      (get-in object path)))
+      (get-in projection path)))
   net.sf.jsqlparser.expression.LongValue
   (render [value _]
     (.getValue value))
@@ -177,35 +195,44 @@
 
 (defn parse-soql
   [soql]
-  (let [ps (.getSelectBody (CCJSqlParserUtil/parse soql))
-        kws (comp keyword str)]
+  (let [ps (.getSelectBody (CCJSqlParserUtil/parse soql))]
     {:select (->> (.getSelectItems ps)
                   (map str)
-                  (map #(string/split % #"\."))
-                  (mapv (partial mapv keyword)))
-     :from (keyword (str (.getFromItem ps)))
+                  (mapv #(string/split % #"\.")))
+     :from (str (.getFromItem ps))
      :where (partial allows? (.getWhere ps))}))
 
 (defn project
   [state type object path]
   (let [{:keys [schema objects]} state
-        type-schema (assoc (type-schema schema type) :id "string")
-        path-type (type-schema (first path))]
-    (when-not path-type
+        type-schema (type-schema schema type)
+        fields (->> (:fields type-schema)
+                    (map (fn [field]
+                           (let [k (if (= "reference" (:type field))
+                                     (:relationshipName field)
+                                     (:name field))]
+                             [k field])))
+                    (into {}))
+        path-field (get fields (first path))]
+    (when-not path-field
       (throw (ex-info "invalid path" {:type type :path path})))
-    (if (keyword? path-type)
+    (if (= "reference" (:type path-field))
       (do
         (when-not (next path)
           (throw (ex-info "invalid path" {:type type :path path})))
-        (if-let [id (get object (first path))]
-          (let [object' (assoc (get-in objects [path-type id]) :id id)]
-            {(first path)
-             (project state path-type object' (next path))})
+        (if-let [id (get object (:name path-field))]
+          (let [type' (first (:referenceTo path-field))
+                object' (get-in state [:objects type' id])]
+            {(keyword (first path))
+             (project state (first (:referenceTo path-field)) object' (next path))})
           {}))
       (do
         (when (next path)
           (throw (ex-info "invalid path" {:type type :path path})))
-        (select-keys object [(first path)])))))
+        (-> object
+            (select-keys [(first path)])
+            walk/keywordize-keys
+            (assoc :attributes {:type type}))))))
 
 (defn deep-merge
   [& maps]
@@ -217,9 +244,10 @@
   [state soql]
   (let [{:keys [schema objects]} state
         {:keys [select from where]} (parse-soql soql)]
-    (->> (map (fn [[id attrs]] (assoc attrs :id id)) (objects from))
+    (->> (vals (get objects from))
          (map (fn [object]
-                (reduce deep-merge {} (map (partial project state from object) select))))
+                (reduce deep-merge {}
+                        (map (partial project state from object) select))))
          (filter where)
          (into []))))
 

@@ -1,3 +1,7 @@
+## 0.3.1
+
+* Revise memory schema to more closely resemble real schema
+
 ## 0.3.0
 
 * Refactor client behind a protocol

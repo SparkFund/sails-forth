@@ -215,3 +215,25 @@
                                     (:name field)))]
           (recur (conj record-path record-key)
                  field-path'))))))
+
+(defn schema
+  [client types]
+  (let [type-attrs #{:name :label :custom :fields}
+        field-attrs #{:name
+                      :type
+                      :referenceTo
+                      :scale
+                      :precision
+                      :label
+                      :relationshipName
+                      :picklistValues
+                      :nillable
+                      :defaultValue}
+        all-types (get-types client)]
+    (into {}
+          (for [type types]
+            (let [type-name ((comp :name all-types) type)
+                  type-schema (-> (sf/describe! client type-name)
+                                  (select-keys type-attrs)
+                                  (update :fields (partial map #(select-keys % field-attrs))))]
+              [type-name type-schema])))))
