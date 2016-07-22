@@ -31,6 +31,10 @@
       (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}}]
              (sf/query! client (str "select Amount__c from Payment__c "
                                     "where Amount__c = 5"))))
+      ;; TODO handle parentheses
+      #_(is (= [{:Amount__c 5 :attributes {:type "Payment__c"}}]
+             (sf/query! client (str "select Amount__c from Payment__c "
+                                    "where (Amount__c = 5)"))))
       (is (not (seq (sf/query! client (str "select Amount__c from Payment__c "
                                            "where Amount__c = 0")))))
       (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}

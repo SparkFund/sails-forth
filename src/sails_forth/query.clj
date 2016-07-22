@@ -57,7 +57,7 @@
   (case op
     :or (str "(" (string/join ") OR (" (map soql-where* args)) ")")
     (let [[lh rh] args]
-      (str "(" (soql-value lh) " " (name op) " " (soql-value rh) ")"))))
+      (str (soql-value lh) " " (name op) " " (soql-value rh)))))
 
 (t/ann ^:no-check soql-where*
        [(t/Seqable WhereClause) -> t/Str])
