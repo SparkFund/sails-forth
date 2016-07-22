@@ -1,3 +1,7 @@
+## 0.3.2
+
+* Relax parentheses in generated soql to faciliate memory client use
+
 ## 0.3.1
 
 * Revise memory schema to more closely resemble real schema
