@@ -1,3 +1,8 @@
+## 0.3.3
+
+* Allow memory client to accept nil values
+* Fix ns references
+
 ## 0.3.2
 
 * Relax parentheses in generated soql to faciliate memory client use
