@@ -41,40 +41,41 @@
                              (filter :active)
                              (map :value)
                              (into #{}))]
-    (case type
-      "id"
-      (string? value)
-      "string"
-      (string? value)
-      "textarea"
-      (string? value)
-      "url"
-      (string? value)
-      "datetime"
-      (instance? DateTime value)
-      "date"
-      (instance? LocalDate value)
-      "double"
-      (number? value)
-      "currency"
-      (number? value)
-      "percent"
-      (number? value)
-      "int"
-      (integer? value)
-      "picklist"
-      (contains? picklist-values value)
-      "multipicklist"
-      (let [all-values (string/split value #";")]
-        (every? (partial contains? picklist-values) all-values))
-      "phone"
-      (string? value)
-      "boolean"
-      (#{true false} value)
-      "reference"
-      (let [type (first (:referenceTo field))]
-        (object-exists? state type value))
-      (throw (ex-info "Unknown field type" {:field field})))))
+    (or (nil? value)
+        (case type
+          "id"
+          (string? value)
+          "string"
+          (string? value)
+          "textarea"
+          (string? value)
+          "url"
+          (string? value)
+          "datetime"
+          (instance? DateTime value)
+          "date"
+          (instance? LocalDate value)
+          "double"
+          (number? value)
+          "currency"
+          (number? value)
+          "percent"
+          (number? value)
+          "int"
+          (integer? value)
+          "picklist"
+          (contains? picklist-values value)
+          "multipicklist"
+          (let [all-values (string/split value #";")]
+            (every? (partial contains? picklist-values) all-values))
+          "phone"
+          (string? value)
+          "boolean"
+          (#{true false} value)
+          "reference"
+          (let [type (first (:referenceTo field))]
+            (object-exists? state type value))
+          (throw (ex-info "Unknown field type" {:field field}))))))
 
 (defn validate-attrs
   [state type attrs]
