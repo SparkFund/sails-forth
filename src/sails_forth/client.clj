@@ -103,3 +103,7 @@
         (memory/limits! client))
       (cache [_]
         cache))))
+
+(defn client?
+  [x]
+  (and (extends? Client (class x)) x))

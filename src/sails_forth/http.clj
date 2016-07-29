@@ -1,56 +1,48 @@
 (ns sails-forth.http
   (:require [cheshire.parse]
             [clj-http.client :as http]
-            [clojure.core.typed :as t]
-            [clojure.core.typed.unsafe :as tu]))
+            [clojure.spec :as s]))
 
-(t/defalias HttpMethod
-  (t/U ':get ':post ':patch ':put ':delete))
+(def http-methods
+  #{:get :post :patch :put :delete})
 
-(t/defalias HttpUrl
-  t/Str)
+(s/def ::method
+  http-methods)
 
-(t/defalias HttpParams
-  (t/Map t/Keyword t/Any))
+(s/def ::url
+  string?)
 
-(t/defalias HttpStatus
-  t/Int)
+(s/def ::param
+  (s/map-of keyword? any?))
 
-(t/defalias Json
-  (t/Rec [v]
-         (t/U t/Str
-              t/Num
-              t/Bool
-              (t/Value nil)
-              (t/Vec v)
-              (t/Map t/Keyword v))))
+(s/def ::status
+  (s/int-in 100 600))
 
-(t/defalias JsonMap
-  (t/Map t/Keyword Json))
+(s/def ::json
+  (s/or :string string?
+        :number bigdec?
+        :nil nil?
+        :vector (s/coll-of ::json :kind vector?)
+        :map (s/map-of keyword? ::json)))
 
-(t/defalias HttpBody
-  Json)
+(s/def ::json-map
+  (s/map-of keyword? ::json))
 
-(t/defalias HttpHeaders
-  (t/Map t/Str t/Str))
+(s/def ::body
+  ::json-map)
 
-(t/defalias HttpRequest
-  (t/HMap :mandatory {:method HttpMethod
-                      :url HttpUrl}))
+(s/def ::headers
+  (s/map-of string? string?))
 
-(t/defalias HttpResponse
-  (t/HMap :mandatory {:status HttpStatus}
-          :optional {:body HttpBody
-                     :headers HttpHeaders}))
+(s/def ::request
+  (s/keys :req-un [::method ::url]))
 
-(t/ann ^:no-check clj-http.client/request [HttpRequest -> HttpResponse])
-(t/ann ^:no-check cheshire.parse/*use-bigdecimals?* t/Bool)
+(s/def ::response
+  (s/keys ::req-un [::status]
+          ::opt-un [::body ::headers]))
 
-(t/defn json-request
-  [method :- HttpMethod
-   headers :- HttpHeaders
-   url :- HttpUrl
-   params :- (t/Option HttpParams)] :- HttpResponse
+(defn json-request
+  [method headers url params]
   (let [request (cond-> {:method method
                          :url url
                          :throw-exceptions false
@@ -70,32 +62,78 @@
     (binding [cheshire.parse/*use-bigdecimals?* true]
       (http/request request))))
 
-(t/defalias Authentication
-  (t/HMap :mandatory {:instance_url t/Str
-                      :access_token t/Str}))
+(s/fdef json-request
+  :args (s/cat :method ::method
+               :headers ::headers
+               :url ::url
+               :params (s/nilable ::params))
+  :ret ::response)
 
-(t/defalias Config
-  (t/HMap :mandatory {:username t/Str
-                      :password t/Str
-                      :token t/Str
-                      :consumer-key t/Str
-                      :consumer-secret t/Str}
-          :optional {:version t/Int
-                     :sandbox? t/Bool
-                     :host t/Str
-                     :read-only? t/Bool}))
+(s/def ::instance_url
+  ::url)
 
-(t/defalias State
-  (t/HMap :mandatory {:host t/Str
-                      :authentication (t/Option Authentication)
-                      :version-url (t/Option HttpUrl)
-                      :requests t/Int
-                      :read-only? t/Bool
-                      :config Config}
-          :complete? true))
+(s/def ::access_token
+  string?)
 
-(t/defn authenticate
-  [config :- Config] :- (t/Option Authentication)
+(s/def ::authentication
+  (s/keys :req-un [::instance_url
+                   ::access_token]))
+
+(s/def ::username
+  string?)
+
+(s/def ::password
+  string?)
+
+(s/def ::token
+  string?)
+
+(s/def ::consumer-key
+  string?)
+
+(s/def ::consumer-secret
+  string?)
+
+(s/def ::version
+  string?)
+
+(s/def ::sandbox?
+  boolean?)
+
+(s/def ::host
+  string?)
+
+(s/def read-only?
+  boolean?)
+
+(s/def ::config
+  (s/keys :req-un [::username
+                   ::password
+                   ::token
+                   ::consumer-key
+                   ::consumer-secret]
+          :opt-un [::version
+                   ::sandbox?
+                   ::host
+                   ::read-only?]))
+
+(s/def ::version-url
+  (s/nilable ::url))
+
+(s/def ::requests
+  (s/or :zero zero?
+        :pos pos-int?))
+
+(s/def ::state
+  (s/keys :req-un [::host
+                   ::authentication
+                   ::version-url
+                   ::requests
+                   ::read-only?
+                   ::config]))
+
+(defn authenticate
+  [config]
   (let [{:keys [host username password token consumer-key consumer-secret]} config
         params {:username username
                 :password (str password token)
@@ -114,29 +152,42 @@
         response (http/request request)
         {:keys [status body]} response]
     (when (and (= 200 status)
-               ((t/pred Authentication) body))
+               (s/valid? ::authentication body))
       body)))
 
-(t/defalias Version
-  (t/HMap :mandatory {:url HttpUrl}))
+(s/fdef authenticate
+  :args (s/cat :config ::config)
+  :ret (s/nilable ::authentication))
 
-(t/ann ^:no-check versions [t/Str -> (t/Option (t/Vec HttpUrl))])
+(s/def ::version
+  (s/keys :req-un [::url]))
+
 (defn versions
   [url]
   (let [url (str url "/services/data/")
         response (json-request :get {} url nil)
         {:keys [status body]} response]
     (when (and (= 200 status)
-               ((t/pred (t/Seq Version)) body))
+               (s/valid? (s/coll-of ::version) body))
       (mapv #(get % :url) body))))
 
-(t/defn derive-host
-  [config :- Config] :- t/Str
+(s/fdef versions
+  :args (s/cat :url ::url)
+  :ret (s/nilable (s/coll-of ::url :kind vector?)))
+
+(defn derive-host
+  [config]
   (let [{:keys [sandbox? host]} config]
     (or host (if sandbox? "test.salesforce.com" "login.salesforce.com"))))
 
-(t/defn build-state
-  [config :- Config] :- State
+(s/fdef derive-host
+  :args (s/cat :config ::config)
+  :ret (s/or :implied #{"test.salesforce.com"
+                        "login.salesforce.com"}
+             :given ::host))
+
+(defn build-state
+  [config]
   (let [{:keys [version]} config
         host (derive-host config)
         read-only? (get config :read-only? false)]
@@ -148,27 +199,36 @@
              :config (assoc config :host host)}
       version (assoc :version-url (str "/services/data/v" version)))))
 
-(t/defn try-authentication
-  [state :- State] :- State
+(s/fdef build-state
+  :args (s/cat :config ::config)
+  :ret ::state)
+
+(defn try-authentication
+  [state]
   (let [{:keys [authentication config requests]} state]
     (cond-> state
       (not authentication)
       (assoc :authentication (authenticate config)
              :requests (inc requests)))))
 
-(t/defn try-to-find-latest-version
-  [state :- State] :- State
+(s/fdef try-authentication
+  :args (s/cat :state ::state)
+  :ret ::state)
+
+(defn try-to-find-latest-version
+  [state]
   (let [{:keys [authentication requests version-url]} state]
     (cond-> state
       (and (not version-url) authentication)
       (assoc :version-url (last (versions (:instance_url authentication)))
              :requests (inc requests)))))
 
-(t/defn request
-  [state :- State
-   method :- HttpMethod
-   url :- HttpUrl
-   params :- HttpParams] :- (t/HVec [State (t/Option HttpResponse)])
+(s/fdef try-to-find-latest-version
+  :args (s/cat :state ::state)
+  :ret ::state)
+
+(defn request
+  [state method url params]
   (when (and (:read-only? state)
              (case method
                :post true
@@ -181,8 +241,8 @@
                 :params params}
           message "Read-only clients may not issue requests with side effects"]
       (throw (ex-info message data))))
-  (t/loop [state :- State state
-           tries :- t/Int 0]
+  (loop [state state
+         tries 0]
     (let [state (-> state
                     try-authentication
                     try-to-find-latest-version)
@@ -202,6 +262,13 @@
                (= tries 0))
         (recur (assoc state :authentication nil) (inc tries))
         [state response]))))
+
+(s/fdef request
+  :args (s/cat :state ::state :method ::method :url ::url :params ::params)
+  :ret (s/tuple ::state (s/nilable ::response)))
+
+(s/def ::client
+  (s/spec ))
 
 (t/defalias SalesforceClient
   (t/Atom1 State))
