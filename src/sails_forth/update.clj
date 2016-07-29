@@ -15,7 +15,7 @@
                             (do (when-not desc
                                   (throw (ex-info (str "no SalesForce attribute for " k)
                                                   {:description desc})))
-                                [sf-k v]))
+                                [sf-k (render-value desc v)]))
                           (into {}))]
     (when-not sf-type
       (throw (ex-info (str "no SalesForce type for " type)
@@ -35,7 +35,7 @@
                             (do (when-not desc
                                   (throw (ex-info (str "no SalesForce attribute for " k)
                                                   {:description desc})))
-                                [sf-k v]))
+                                [sf-k (render-value desc v)]))
                           (into {}))]
     (when-not sf-type
       (throw (ex-info (str "no SalesForce type for " type)

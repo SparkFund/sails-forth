@@ -170,6 +170,19 @@
                        (bigint value))
                      value)
           "int" (long value)
+          "percent" (/ value 100M)
+          value)))))
+
+(def render-value
+  "Parses the given value according to its field type and other characteristics"
+  (let [date-time-formatter (tf/formatters :date-time)
+        date-formatter (tf/formatters :date)]
+    (fn [field value]
+      (let [{:keys [type scale precision]} field]
+        (case type
+          "datetime" (tf/unparse date-time-formatter (tc/to-date-time value))
+          "date" (tf/unparse date-formatter (tc/to-date-time value))
+          "percent" (* value 100M)
           value)))))
 
 (t/ann ^:no-check resolve-attr-path

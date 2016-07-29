@@ -1,3 +1,9 @@
+## 0.4.0
+
+* Convert percent type values to decimal values
+* Add render-value fn
+* Use render-value when pushing updates using sails-forth.update
+
 ## 0.3.3
 
 * Allow memory client to accept nil values
