@@ -170,6 +170,7 @@
                        (bigint value))
                      value)
           "int" (long value)
+          "percent" (/ value 100M)
           value)))))
 
 (t/ann ^:no-check resolve-attr-path

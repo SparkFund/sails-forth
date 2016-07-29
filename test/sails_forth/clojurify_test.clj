@@ -30,6 +30,11 @@
                                :scale 2
                               :precision 18}
                              500M))))
+  (testing "percent"
+    (is (= 0.0618M (parse-value {:type "percent"
+                                 :scale 2
+                                 :precision 4}
+                                6.18M))))
   (testing "int"
     (is (= 500 (parse-value {:type "int"} 500M))))
   (testing "other"
