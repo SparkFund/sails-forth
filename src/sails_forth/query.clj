@@ -151,3 +151,18 @@
         (mapv (fn [record]
                 {type record})
               (query-attr-paths client type (map next attr-paths) (:where query)))))))
+
+(defn record-types
+  [client]
+  (let [cache (sf/cache client)]
+    (or (sf/get! cache ::record-types)
+        (let [rows (query client {:find [:recordtype :id :name]})
+              idx (->> (map :recordtype rows)
+                       (map (juxt :name :id))
+                       (into {}))]
+          (sf/put! cache ::record-types idx)
+          idx))))
+
+(defn record-type-id
+  [client record-type-name]
+  (get (record-types client) record-type-name))
