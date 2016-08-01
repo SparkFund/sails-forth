@@ -1,3 +1,7 @@
+## 0.4.1
+
+* Add record-type-id fn and record-types cache
+
 ## 0.4.0
 
 * Convert percent type values to decimal values
