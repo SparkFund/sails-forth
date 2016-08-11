@@ -117,11 +117,12 @@
 
 (s/def ::state
   (s/keys :req-un [::host
-                   ::authentication
-                   ::version-url
                    ::requests
                    ::read-only?
-                   ::config]))
+                   ::config]
+          :opt-un [::authentication
+                   ::version-url
+                   ::version]))
 
 (s/fdef authenticate
   :args (s/cat :config ::config)
@@ -150,12 +151,16 @@
                (s/valid? ::authentication body))
       body)))
 
-(s/def ::version
-  (s/keys :req-un [::url]))
+(s/def ::version-map
+  (s/keys :req-un [::url
+                   ::version]))
+
+(s/def ::versions
+  (s/coll-of ::version-map))
 
 (s/fdef versions
   :args (s/cat :url ::url)
-  :ret (s/nilable (s/coll-of ::url :kind vector?)))
+  :ret (s/nilable ::version))
 
 (defn versions
   [url]
@@ -163,8 +168,8 @@
         response (json-request :get {} url nil)
         {:keys [status body]} response]
     (when (and (= 200 status)
-               (s/valid? (s/coll-of ::version) body))
-      (mapv #(get % :url) body))))
+               (s/valid? ::versions body))
+      body)))
 
 (s/def ::api-hosts
   #{"test.salesforce.com" "login.salesforce.com"})
@@ -214,10 +219,14 @@
 
 (defn try-to-find-latest-version
   [state]
-  (let [{:keys [authentication requests version-url]} state]
+  (let [{:keys [authentication requests version version-url]} state
+        last-version (when (and (not (and version version-url))
+                                authentication)
+                       (last (versions (:instance_url authentication))))]
     (cond-> state
-      (and (not version-url) authentication)
-      (assoc :version-url (last (versions (:instance_url authentication)))
+      last-version
+      (assoc :version-url (:url last-version)
+             :version (:version last-version)
              :requests (inc requests)))))
 
 (s/fdef request
