@@ -1,8 +1,11 @@
 (ns sails-forth.repl
-  (:require [clojure.core.typed :as t]
-            [clojure.edn :as edn]
+  (:require [clojure.edn :as edn]
+            [clojure.spec :as s]
             [sails-forth.client :as sf]
-            [sails-forth.query :as sq]))
+            [sails-forth.clojurify :as sc]
+            [sails-forth.query :as sq]
+            [sails-forth.spec :as spec]
+            [sails-forth.update :as su]))
 
 (defn build-client!
   [path]

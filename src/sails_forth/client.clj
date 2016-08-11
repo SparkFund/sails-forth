@@ -1,10 +1,25 @@
 (ns sails-forth.client
-  (:require [sails-forth.http :as http]
-            [sails-forth.memory :as memory]))
+  (:require [clojure.spec :as s]
+            [sails-forth.http :as http]
+            [sails-forth.memory :as memory]
+            [sails-forth.spec :as spec]))
 
 (defprotocol Cache
   (put! [_ key value])
   (get! [_ key]))
+
+(s/def ::cache
+  (partial satisfies? Cache))
+
+(s/fdef put!
+  :args (s/cat :cache ::cache
+               :key any?
+               :value any?))
+
+(s/fdef get!
+  :args (s/cat :cache ::cache
+               :key any?)
+  :ret any?)
 
 (defprotocol Client
   (create!
@@ -43,6 +58,60 @@
    [_]
    "Returns a persistent cache"))
 
+(s/def ::client
+  (partial satisfies? Client))
+
+(s/fdef create!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :attrs ::spec/attrs)
+  :ret ::spec/id)
+
+(s/fdef delete!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :id ::spec/id)
+  :ret #{true})
+
+(s/fdef update!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :id ::spec/id
+               :attrs ::spec/attrs)
+  :ret #{true})
+
+(s/fdef list!
+  :args (s/cat :client ::client
+               :type ::spec/type)
+  :ret ::spec/json-map)
+
+(s/fdef describe!
+  :args (s/cat :client ::client
+               :type ::spec/type)
+  :ret ::spec/object-description)
+
+(s/fdef objects!
+  :args (s/cat :client ::client)
+  :ret ::spec/objects-overview)
+
+(s/fdef query!
+  :args (s/cat :client ::client
+               :query ::spec/query)
+  :ret ::spec/records)
+
+(s/fdef count!
+  :args (s/cat :client ::client
+               :query ::spec/query)
+  :ret nat-int?)
+
+(s/fdef limits!
+  :args (s/cat :client ::client)
+  :ret ::spec/limits)
+
+(s/fdef build-atomic-cache
+  :args (s/cat)
+  :ret ::cache)
+
 (defn build-atomic-cache
   []
   (let [state (atom {})]
@@ -51,6 +120,10 @@
         (swap! state assoc-in [::cache key] value))
       (get! [_ key]
         (get-in @state [::cache key])))))
+
+(s/fdef build-http-client
+  :args (s/cat :config ::http/config)
+  :ret ::client)
 
 (defn build-http-client
   [config]
@@ -77,6 +150,10 @@
         (http/limits! client))
       (cache [_]
         cache))))
+
+(s/fdef build-memory-client
+  :args (s/cat :schema ::memory/schema)
+  :ret ::client)
 
 (defn build-memory-client
   [schema]

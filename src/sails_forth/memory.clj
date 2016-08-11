@@ -1,11 +1,16 @@
 (ns sails-forth.memory
   (:require [clojure.set :as set]
+            [clojure.spec :as s]
             [clojure.string :as string]
             [clojure.walk :as walk])
   (:import [java.util UUID]
            [net.sf.jsqlparser.parser CCJSqlParserUtil]
            [org.joda.time DateTime LocalDate])
   (:refer-clojure :exclude [update list]))
+
+;; TODO could narrow this down a bit lol
+(s/def ::schema
+  any?)
 
 (defn build-state
   [schema]

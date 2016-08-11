@@ -1,7 +1,8 @@
 (ns sails-forth.http
   (:require [cheshire.parse]
             [clj-http.client :as http]
-            [clojure.spec :as s]))
+            [clojure.spec :as s]
+            [sails-forth.spec :as spec]))
 
 (def http-methods
   #{:get :post :patch :put :delete})
@@ -18,18 +19,8 @@
 (s/def ::status
   (s/int-in 100 600))
 
-(s/def ::json
-  (s/or :string string?
-        :number bigdec?
-        :nil nil?
-        :vector (s/coll-of ::json :kind vector?)
-        :map (s/map-of keyword? ::json)))
-
-(s/def ::json-map
-  (s/map-of keyword? ::json))
-
 (s/def ::body
-  ::json-map)
+  ::spec/json-map)
 
 (s/def ::headers
   (s/map-of string? string?))
@@ -40,6 +31,13 @@
 (s/def ::response
   (s/keys ::req-un [::status]
           ::opt-un [::body ::headers]))
+
+(s/fdef json-request
+  :args (s/cat :method ::method
+               :headers ::headers
+               :url ::url
+               :params (s/nilable ::params))
+  :ret ::response)
 
 (defn json-request
   [method headers url params]
@@ -61,13 +59,6 @@
                   (assoc :query-params params))]
     (binding [cheshire.parse/*use-bigdecimals?* true]
       (http/request request))))
-
-(s/fdef json-request
-  :args (s/cat :method ::method
-               :headers ::headers
-               :url ::url
-               :params (s/nilable ::params))
-  :ret ::response)
 
 (s/def ::instance_url
   ::url)
@@ -132,6 +123,10 @@
                    ::read-only?
                    ::config]))
 
+(s/fdef authenticate
+  :args (s/cat :config ::config)
+  :ret (s/nilable ::authentication))
+
 (defn authenticate
   [config]
   (let [{:keys [host username password token consumer-key consumer-secret]} config
@@ -155,12 +150,12 @@
                (s/valid? ::authentication body))
       body)))
 
-(s/fdef authenticate
-  :args (s/cat :config ::config)
-  :ret (s/nilable ::authentication))
-
 (s/def ::version
   (s/keys :req-un [::url]))
+
+(s/fdef versions
+  :args (s/cat :url ::url)
+  :ret (s/nilable (s/coll-of ::url :kind vector?)))
 
 (defn versions
   [url]
@@ -171,20 +166,22 @@
                (s/valid? (s/coll-of ::version) body))
       (mapv #(get % :url) body))))
 
-(s/fdef versions
-  :args (s/cat :url ::url)
-  :ret (s/nilable (s/coll-of ::url :kind vector?)))
+(s/def ::api-hosts
+  #{"test.salesforce.com" "login.salesforce.com"})
+
+(s/fdef derive-host
+  :args (s/cat :config ::config)
+  :ret (s/or :implied ::api-hosts
+             :given ::host))
 
 (defn derive-host
   [config]
   (let [{:keys [sandbox? host]} config]
     (or host (if sandbox? "test.salesforce.com" "login.salesforce.com"))))
 
-(s/fdef derive-host
+(s/fdef build-state
   :args (s/cat :config ::config)
-  :ret (s/or :implied #{"test.salesforce.com"
-                        "login.salesforce.com"}
-             :given ::host))
+  :ret ::state)
 
 (defn build-state
   [config]
@@ -199,8 +196,8 @@
              :config (assoc config :host host)}
       version (assoc :version-url (str "/services/data/v" version)))))
 
-(s/fdef build-state
-  :args (s/cat :config ::config)
+(s/fdef try-authentication
+  :args (s/cat :state ::state)
   :ret ::state)
 
 (defn try-authentication
@@ -211,7 +208,7 @@
       (assoc :authentication (authenticate config)
              :requests (inc requests)))))
 
-(s/fdef try-authentication
+(s/fdef try-to-find-latest-version
   :args (s/cat :state ::state)
   :ret ::state)
 
@@ -223,9 +220,9 @@
       (assoc :version-url (last (versions (:instance_url authentication)))
              :requests (inc requests)))))
 
-(s/fdef try-to-find-latest-version
-  :args (s/cat :state ::state)
-  :ret ::state)
+(s/fdef request
+  :args (s/cat :state ::state :method ::method :url ::url :params ::params)
+  :ret (s/tuple ::state (s/nilable ::response)))
 
 (defn request
   [state method url params]
@@ -263,40 +260,30 @@
         (recur (assoc state :authentication nil) (inc tries))
         [state response]))))
 
-(s/fdef request
-  :args (s/cat :state ::state :method ::method :url ::url :params ::params)
-  :ret (s/tuple ::state (s/nilable ::response)))
-
 (s/def ::client
-  (s/spec ))
+  (s/and (partial instance? clojure.lang.Atom)
+         (comp (partial s/valid? ::state) deref)))
 
-(t/defalias SalesforceClient
-  (t/Atom1 State))
+(s/fdef request!
+  :args (s/cat :client ::client
+               :method ::method
+               :url ::url
+               :params ::params)
+  :ret (s/nilable ::response))
 
-(t/defn request!
+(defn request!
   "Issue the given request using the given client"
-  [client :- SalesforceClient
-   method :- HttpMethod
-   url :- HttpUrl
-   params :- HttpParams] :- (t/Option HttpResponse)
+  [client method url params]
   (let [[client' response] (request @client method url params)]
     ;; TODO could try to merge states, otherwise request count may be incorrect
     (reset! client client')
     response))
 
-(t/defalias SalesforceId
-  t/Str)
+(s/fdef build-client!
+  :args (s/cat :config ::config)
+  :ret ::client)
 
-(t/defalias SalesforceType
-  t/Str)
-
-(t/defalias SalesforceAttrs
-  (t/Map t/Keyword t/Str))
-
-(t/defalias SalesforceQuery
-  t/Str)
-
-(t/defn build-client!
+(defn build-client!
   "Creates a stateful Salesforce client from the given config. The client
    authenticates lazily and uses the latest Salesforce version if none is
    specified. If an authenticated request receives an invalid authentication
@@ -308,25 +295,26 @@
 
    This fn explicitly makes no guarantees regarding the type of the client
    entity, other than it can be used with the user-facing fns in this ns."
-  [config :- Config] :- SalesforceClient
+  [config]
   (atom (build-state config)))
 
-(t/defalias SalesforceEntity
-  (t/HMap :mandatory {:id SalesforceId}))
+(s/fdef create!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :attrs ::spec/attrs)
+  :ret ::spec/id)
 
-(t/defn create!
+(defn create!
   "Creates an object of the given type and attrs using the given salesforce
    client. If salesforce responds successfully, this returns the object's id,
    otherwise this raises an exception."
-  [client :- SalesforceClient
-   type :- SalesforceType
-   attrs :- SalesforceAttrs] :- SalesforceId
+  [client type attrs]
   (let [url (str "/sobjects/" type)
         response (request! client :post url attrs)
         {:keys [status body]} response]
     (if (and (= 201 status)
-             ((t/pred SalesforceEntity) body))
-      (get (tu/ignore-with-unchecked-cast body SalesforceEntity) :id)
+             (s/valid? ::spec/entity body))
+      (get body :id)
       (let [data {:type type
                   :attrs attrs
                   :status status
@@ -337,12 +325,16 @@
                       "Invalid salesforce response")]
         (throw (ex-info message data))))))
 
-(t/defn delete!
+(s/fdef delete!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :id ::spec/id)
+  :ret boolean?)
+
+(defn delete!
   "Deletes the object of the given type with the given id. This returns true
    if it succeeds and raises an exception otherwise."
-  [client :- SalesforceClient
-   type :- SalesforceType
-   id :- SalesforceId] :- (t/Value true)
+  [client type id]
   (let [url (str "/sobjects/" type "/" id)
         response (request! client :delete url {})
         {:keys [status body]} response]
@@ -357,13 +349,17 @@
                       "Invalid salesforce response")]
         (throw (ex-info message data))))))
 
-(t/defn update!
+(s/fdef update!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :id ::spec/id
+               :attrs ::spec/attrs)
+  :ret boolean?)
+
+(defn update!
   "Updates the object of the given type with the given id. This returns true
    if it succeeds and raises an exception otherwise."
-  [client :- SalesforceClient
-   type :- SalesforceType
-   id :- SalesforceId
-   attrs :- SalesforceAttrs] :- (t/Value true)
+  [client type id attrs]
   (let [url (str "/sobjects/" type "/" id)
         response (request! client :patch url attrs)
         {:keys [status body]} response]
@@ -378,15 +374,18 @@
                       "Invalid salesforce response")]
         (throw (ex-info message data))))))
 
-(t/defn list!
-  [client :- SalesforceClient
-   type :- SalesforceType] :- (t/Option JsonMap)
+(s/fdef list!
+  :args (s/cat :client ::spec/client
+               :type ::spec/type)
+  :ret (s/nilable ::spec/json-map))
+
+(defn list!
+  [client type]
   (let [url (str "/sobjects/" type)
         response (request! client :get url {})
         {:keys [status body]} response]
-    ;; TODO t/cast doesn't work with Json or JsonMap
     (cond (and (= 200 status)
-               ((t/pred JsonMap) body))
+               (s/valid? ::spec/json-map body))
           body
           (= 404 status)
           nil
@@ -397,29 +396,18 @@
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
-(t/defalias SalesforceFieldDescription
-  (t/HMap :mandatory {:name t/Str
-                      :type t/Str
-                      :referenceTo (t/Vec t/Str)
-                      :scale t/AnyInteger
-                      :precision t/AnyInteger
-                      :label t/Str
-                      :relationshipName t/Any}))
+(s/fdef describe!
+  :args (s/cat :client ::client
+               :type ::spec/type)
+  :ret (s/nilable ::spec/object-description))
 
-(t/defalias SalesforceObjectDescription
-  (t/HMap :mandatory {:name t/Str
-                      :label t/Str
-                      :custom t/Bool
-                      :fields (t/Vec SalesforceFieldDescription)}))
-
-(t/defn describe!
-  [client :- SalesforceClient
-   type :- SalesforceType] :- (t/Option SalesforceObjectDescription)
+(defn describe!
+  [client type]
   (let [url (str "/sobjects/" type "/describe")
         response (request! client :get url {})
         {:keys [status body]} response]
     (cond (and (= 200 status)
-               ((t/pred SalesforceObjectDescription) body))
+               (s/valid? ::spec/object-description body))
           body
           (= 404 status)
           nil
@@ -430,52 +418,42 @@
                 message "Could not retrieve description of salesforce object"]
             (throw (ex-info message data))))))
 
-(t/defalias SalesforceObjectOverview
-  (t/HMap :mandatory {:name t/Str
-                      :label t/Str
-                      :custom t/Bool}))
+(s/fdef objects!
+  :args (s/cat :client ::client)
+  :ret ::spec/objects-overview)
 
-(t/defalias SalesforceObjectsOverview
-  (t/HMap :mandatory {:sobjects (t/Vec SalesforceObjectOverview)}))
-
-(t/defn objects!
-  [client :- SalesforceClient] :- SalesforceObjectsOverview
+(defn objects!
+  [client]
   (let [url "/sobjects"
         response (request! client :get url {})
         {:keys [status body]} response]
     (cond (and (= 200 status)
-               ((t/pred SalesforceObjectsOverview) body))
-          (tu/ignore-with-unchecked-cast body SalesforceObjectsOverview)
+               (s/valid? ::spec/objects-overview body))
+          body
           :else
           (let [data {:status status
                       :body body}
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
-(t/defalias SalesforceQueryResults
-  (t/U (t/HMap :mandatory {:done (t/Value true)
-                           :totalSize t/AnyInteger
-                           :records (t/Vec JsonMap)})
-       (t/HMap :mandatory {:done (t/Value false)
-                           :totalSize t/AnyInteger
-                           :records (t/Vec JsonMap)
-                           :nextRecordsUrl HttpUrl})))
+(s/fdef query!
+  :args (s/cat :client ::client
+               :query ::spec/query)
+  :ret ::spec/records)
 
-(t/defn query!
+(defn query!
   "Executes the given query and returns all results, eagerly fetching if there
    is pagination"
-  [client :- SalesforceClient
-   query :- SalesforceQuery] :- (t/Vec JsonMap)
+  [client query]
   (let [url "/query"
         params {:q query}
         response (request! client :get url params)]
-    (t/loop [response :- (t/Option HttpResponse) response
-             results :- (t/Vec JsonMap) []]
+    (loop [response response
+           results []]
       (let [{:keys [status body]} response]
         (if (and (= 200 status)
-                 ((t/pred SalesforceQueryResults) body))
-          (let [body (tu/ignore-with-unchecked-cast body SalesforceQueryResults)
-                results (into results (get body :records))]
+                 (s/valid? ::spec/query-results body))
+          (let [results (into results (get body :records))]
             (if (get body :done)
               results
               (let [url (get body :nextRecordsUrl)]
@@ -486,46 +464,39 @@
                 message "Could not execute salesforce query"]
             (throw (ex-info message data))))))))
 
-;; :records could be (t/Value []) but t/pred doesn't work on that
-(t/defalias SalesforceCountQueryResults
-  (t/HMap :mandatory {:done (t/Value true)
-                      :totalSize t/AnyInteger
-                      :records (t/Vec t/Nothing)}))
+(s/fdef count!
+  :args (s/cat :client ::client
+               :query ::spec/query)
+  :ret nat-int?)
 
-(t/defn count!
+(defn count!
   "Executes the given query and returns the total number of results.
    This is intended for use with COUNT() queries."
-  [client :- SalesforceClient
-   query :- SalesforceQuery] :- t/AnyInteger
+  [client query]
   (let [url "/query"
         params {:q query}
         response (request! client :get url params)]
     (let [{:keys [status body]} response]
       (if (and (= 200 status)
-               ((t/pred SalesforceCountQueryResults) body))
-        (let [body (tu/ignore-with-unchecked-cast body SalesforceCountQueryResults)]
-          (get body :totalSize))
+               (s/valid? ::spec/count-query-results body))
+        (get body :totalSize)
         (let [data {:query query
                     :status status
                     :body body}
               message "Could not execute salesforce count query"]
           (throw (ex-info message data)))))))
 
-(t/defalias SalesforceLimit
-  (t/HMap :mandatory {:Max t/AnyInteger
-                      :Remaining t/AnyInteger}
-          :complete? true))
+(s/fdef limits!
+  :args (s/cat :client ::client)
+  :ret ::spec/limits)
 
-(t/defalias SalesforceLimits
-  (t/Map t/Keyword SalesforceLimit))
-
-(t/defn limits!
-  [client :- SalesforceClient] :- SalesforceLimits
+(defn limits!
+  [client]
   (let [response (request! client :get "/limits" {})
         {:keys [status body]} response]
     (if (and (= 200 status)
-             ((t/pred SalesforceLimits) body))
-      (tu/ignore-with-unchecked-cast body SalesforceLimits)
+             (s/valid? ::spec/limits body))
+      body
       (let [data {:status status
                   :body body}
             message "Could not find salesforce limits"]

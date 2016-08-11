@@ -1,10 +1,17 @@
 (ns sails-forth.update
   "Execute SalesForce updates using more idiomatic Clojure syntax."
-  (:require [clojure.core.typed :as t]
-            [sails-forth.client :as sc]
-            [sails-forth.clojurify :refer :all]))
+  (:require [clojure.spec :as s]
+            [sails-forth.client :as sf]
+            [sails-forth.clojurify :as sc :refer :all]
+            [sails-forth.spec :as spec]))
 
-(t/ann update! [sc/SalesforceClient Keyword sc/SalesforceId (t/Map t/Keyword t/Any)])
+(s/fdef update!
+  :args (s/cat :client ::sf/client
+               :type ::sc/attr
+               :object-id ::spec/id
+               :values (s/map-of ::sc/attr ::sc/value))
+  :ret #{true})
+
 (defn update!
   "Performs updates on the object `object-id` with the given `type`."
   [client type object-id new-value-map]
@@ -20,12 +27,17 @@
     (when-not sf-type
       (throw (ex-info (str "no SalesForce type for " type)
                       {:description (get-type-description client type)})))
-    (sc/update! client
+    (sf/update! client
                 sf-type
                 object-id
                 sf-value-map)))
 
-(t/ann create! [sc/SalesforceClient Keyword (t/Map t/Keyword t/Any)])
+(s/fdef create!
+  :args (s/cat :client ::sf/client
+               :type ::sc/attr
+               :values (s/map-of ::sc/attr ::sc/value))
+  :ret ::spec/id)
+
 (defn create!
   [client type new-value-map]
   (let [sf-type (:name (get-type-description client type))
@@ -40,6 +52,6 @@
     (when-not sf-type
       (throw (ex-info (str "no SalesForce type for " type)
                       {:description (get-type-description client type)})))
-    (sc/create! client
+    (sf/create! client
                 sf-type
                 sf-value-map)))

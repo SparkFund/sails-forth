@@ -1,6 +1,5 @@
 (ns sails-forth.http-test
-  (:require [clojure.core.typed :as t]
-            [clojure.test :refer :all]
+  (:require [clojure.test :refer :all]
             [sails-forth.http :refer :all]
             [sails-forth.test :as test]))
 
