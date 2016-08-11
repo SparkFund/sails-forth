@@ -550,3 +550,19 @@
                (s/valid? ::job body)
                (= "Open" (:state body)))
       (:id body))))
+
+(s/fdef close-import-job!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :id ::spec/id)
+  :ret (s/nilable true?))
+
+(defn close-import-job!
+  [client type id]
+  (let [params {:state "Closed"}
+        response (request! client :post :async (str "/job/" id) params)
+        {:keys [status body]} response]
+    (when (and (= 200 status)
+               (s/valid? ::job body)
+               (= "Closed" (:state body)))
+      true)))
