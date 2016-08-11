@@ -229,12 +229,19 @@
              :version (:version last-version)
              :requests (inc requests)))))
 
+(s/def ::service
+  #{:data :async})
+
 (s/fdef request
-  :args (s/cat :state ::state :method ::method :url ::url :params ::params)
+  :args (s/cat :state ::state
+               :method ::method
+               :service ::service
+               :url ::url
+               :params ::params)
   :ret (s/tuple ::state (s/nilable ::response)))
 
 (defn request
-  [state method url params]
+  [state method service url params]
   (when (and (:read-only? state)
              (case method
                :post true
@@ -252,13 +259,17 @@
     (let [state (-> state
                     try-authentication
                     try-to-find-latest-version)
-          {:keys [authentication requests version-url]} state
+          {:keys [authentication requests version version-url]} state
           response (when-let [{:keys [access_token instance_url]} authentication]
-                     (let [url (if (and version-url
-                                        (.startsWith ^String url version-url))
-                                 (str instance_url url)
-                                 (str instance_url version-url url))
-                           headers {"Authorization" (str "Bearer " access_token)}]
+                     (let [[url-pattern headers]
+                           ;; Salesforce: not a shining example of consistency
+                           (case service
+                             :data ["%s/services/%s/v%s%s"
+                                    {"Authorization" (str "Bearer " access_token)}]
+                             :async ["%s/services/%s/%s%s"
+                                     {"X-SFDC-Session" access_token}])
+                           url (format url-pattern
+                                       instance_url (name service) version url)]
                        (json-request method headers url params)))
           {:keys [status body]} response
           state (cond-> state
@@ -276,14 +287,15 @@
 (s/fdef request!
   :args (s/cat :client ::client
                :method ::method
+               :service ::service
                :url ::url
                :params ::params)
   :ret (s/nilable ::response))
 
 (defn request!
   "Issue the given request using the given client"
-  [client method url params]
-  (let [[client' response] (request @client method url params)]
+  [client method service url params]
+  (let [[client' response] (request @client method service url params)]
     ;; TODO could try to merge states, otherwise request count may be incorrect
     (reset! client client')
     response))
@@ -319,7 +331,7 @@
    otherwise this raises an exception."
   [client type attrs]
   (let [url (str "/sobjects/" type)
-        response (request! client :post url attrs)
+        response (request! client :post :data url attrs)
         {:keys [status body]} response]
     (if (and (= 201 status)
              (s/valid? ::spec/entity body))
@@ -345,7 +357,7 @@
    if it succeeds and raises an exception otherwise."
   [client type id]
   (let [url (str "/sobjects/" type "/" id)
-        response (request! client :delete url {})
+        response (request! client :delete :data url {})
         {:keys [status body]} response]
     (if (= 204 status)
       true
@@ -370,7 +382,7 @@
    if it succeeds and raises an exception otherwise."
   [client type id attrs]
   (let [url (str "/sobjects/" type "/" id)
-        response (request! client :patch url attrs)
+        response (request! client :patch :data url attrs)
         {:keys [status body]} response]
     (if (= 204 status)
       true
@@ -391,7 +403,7 @@
 (defn list!
   [client type]
   (let [url (str "/sobjects/" type)
-        response (request! client :get url {})
+        response (request! client :get :data url {})
         {:keys [status body]} response]
     (cond (and (= 200 status)
                (s/valid? ::spec/json-map body))
@@ -413,7 +425,7 @@
 (defn describe!
   [client type]
   (let [url (str "/sobjects/" type "/describe")
-        response (request! client :get url {})
+        response (request! client :get :data url {})
         {:keys [status body]} response]
     (cond (and (= 200 status)
                (s/valid? ::spec/object-description body))
@@ -434,7 +446,7 @@
 (defn objects!
   [client]
   (let [url "/sobjects"
-        response (request! client :get url {})
+        response (request! client :get :data url {})
         {:keys [status body]} response]
     (cond (and (= 200 status)
                (s/valid? ::spec/objects-overview body))
@@ -456,7 +468,7 @@
   [client query]
   (let [url "/query"
         params {:q query}
-        response (request! client :get url params)]
+        response (request! client :get :data url params)]
     (loop [response response
            results []]
       (let [{:keys [status body]} response]
@@ -466,7 +478,7 @@
             (if (get body :done)
               results
               (let [url (get body :nextRecordsUrl)]
-                (recur (request! client :get url {}) results))))
+                (recur (request! client :get :data url {}) results))))
           (let [data {:query query
                       :status status
                       :body body}
@@ -484,7 +496,7 @@
   [client query]
   (let [url "/query"
         params {:q query}
-        response (request! client :get url params)]
+        response (request! client :get :data url params)]
     (let [{:keys [status body]} response]
       (if (and (= 200 status)
                (s/valid? ::spec/count-query-results body))
@@ -501,7 +513,7 @@
 
 (defn limits!
   [client]
-  (let [response (request! client :get "/limits" {})
+  (let [response (request! client :get :data "/limits" {})
         {:keys [status body]} response]
     (if (and (= 200 status)
              (s/valid? ::spec/limits body))
@@ -510,3 +522,31 @@
                   :body body}
             message "Could not find salesforce limits"]
         (throw (ex-info message data))))))
+
+(s/def ::job-operation
+  #{:insert})
+
+(s/def :sails-forth.http.job/state
+  #{"Open" "Closed"})
+
+(s/def ::job
+  (s/keys :req-un [::spec/id
+                   :sails-forth.http.job/state]))
+
+(s/fdef create-import-job!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :operation ::job-operation)
+  :ret (s/nilable ::spec/id))
+
+(defn create-import-job!
+  [client type operation]
+  (let [params {:operation (name operation)
+                :object type
+                :contentType "CSV"}
+        response (request! client :post :async "/job" params)
+        {:keys [status body]} response]
+    (when (and (= 201 status)
+               (s/valid? ::job body)
+               (= "Open" (:state body)))
+      (:id body))))
