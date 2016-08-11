@@ -23,40 +23,43 @@
 
 (defprotocol Client
   (create!
-   [_ type attrs]
-   "Creates an object of the given type and attrs using the given salesforce
-    client. If salesforce responds successfully, this returns the object's id,
-    otherwise this raises an exception.")
+    [_ type attrs]
+    "Creates an object of the given type and attrs using the given salesforce
+     client. If salesforce responds successfully, this returns the object's id,
+     otherwise this raises an exception.")
   (delete!
-   [_ type id]
-   "Deletes the object of the given type with the given id. This returns true
-   if it succeeds and raises an exception otherwise.")
-  (update!
-   [_ type id attrs]
-   "Updates the object of the given type with the given id. This returns true
+    [_ type id]
+    "Deletes the object of the given type with the given id. This returns true
     if it succeeds and raises an exception otherwise.")
+  (update!
+    [_ type id attrs]
+    "Updates the object of the given type with the given id. This returns true
+     if it succeeds and raises an exception otherwise.")
   (list!
-   [_ type]
-   "Lists all objets of the given type")
+    [_ type]
+    "Lists all objets of the given type")
   (describe!
-   [_ type]
-   "Describes the given type")
+    [_ type]
+    "Describes the given type")
   (objects!
    [_]
    "Lists all objects")
   (query!
-   [_ query]
-   "Executes the given query and returns all results, eagerly fetching if there
-    is pagination")
+    [_ query]
+    "Executes the given query and returns all results, eagerly fetching if there
+     is pagination")
   (count!
-   [_ query]
-   "Returns the number of results from the given query")
+    [_ query]
+    "Returns the number of results from the given query")
   (limits!
-   [_]
-   "Returns the current limits")
+    [_]
+    "Returns the current limits")
   (cache
-   [_]
-   "Returns a persistent cache"))
+    [_]
+    "Returns a persistent cache")
+  (import!
+    [_ type data options]
+    "Imports the given data into the given type according to the given options"))
 
 (s/def ::client
   (partial satisfies? Client))
@@ -107,6 +110,15 @@
 (s/fdef limits!
   :args (s/cat :client ::client)
   :ret ::spec/limits)
+
+(s/fdef import!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :data (s/coll-of ::spec/attrs)
+               :options (s/map-of keyword? any?))
+  :ret (s/coll-of boolean? :kind vector?)
+  :fn (fn [{:keys [args ret]}]
+        (= (count (:data args)) (count ret))))
 
 (s/fdef build-atomic-cache
   :args (s/cat)
