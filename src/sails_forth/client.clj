@@ -118,7 +118,7 @@
   :ret (s/and (partial instance? clojure.lang.IDeref)
               (comp (partial s/valid? (s/coll-of any?)) deref))
   :fn (fn [{:keys [args ret]}]
-        (= (count (:data args)) (count @ret))))
+        (= (count (:records args)) (count @ret))))
 
 (s/fdef build-atomic-cache
   :args (s/cat)
