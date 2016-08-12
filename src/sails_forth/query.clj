@@ -1,12 +1,13 @@
 (ns sails-forth.query
   "Provides for executing queries using more idiomatic clojure forms"
-  (:require [clojure.core.typed :as t]
+  (:require [clojure.spec :as s]
             [clojure.string :as string]
             [sails-forth.client :as sf]
-            [sails-forth.clojurify :refer :all]))
+            [sails-forth.clojurify :as sc :refer :all]
+            [sails-forth.spec :as spec]))
 
-(t/defprotocol SoqlValue
-  (soql-value [_] :- t/Str))
+(defprotocol SoqlValue
+  (soql-value [_]))
 
 ;; TODO figure out how to annotate these impls
 (extend-protocol SoqlValue
@@ -34,23 +35,25 @@
             (recur (conj refs ref)
                    fields')))))))
 
-(t/defalias WhereOp
-  "Operators allowed in where clauses"
-  (t/U ':in ':= ':or))
+(s/def ::where-operator
+  #{:in := :or})
 
-(t/defalias WhereSimpleValue
-  (t/U t/Str))
+(s/def ::where-value
+  (s/or :string string?
+        :set (s/coll-of string? :kind set?)
+        :fields ::sc/field-path))
 
-(t/defalias WhereValue
-  (t/U WhereSimpleValue (t/Set WhereSimpleValue) FieldPath))
-
-(t/defalias WhereClause
-  '[WhereOp WhereValue WhereValue])
+(s/def ::where-clause
+  (s/cat :operator ::where-operator
+         :lhs ::where-value
+         ::rhs ::where-value))
 
 (declare soql-where*)
 
-(t/ann ^:no-check soql-where
-       [WhereClause -> t/Str])
+(s/fdef soql-where
+  :args (s/cat :clause ::where-clause)
+  :ret string?)
+
 (defn soql-where
   [[op & args]]
   ;; TODO the type of op is significant
@@ -59,14 +62,21 @@
     (let [[lh rh] args]
       (str (soql-value lh) " " (name op) " " (soql-value rh)))))
 
-(t/ann ^:no-check soql-where*
-       [(t/Seqable WhereClause) -> t/Str])
+(s/fdef soql-where*
+  :args (s/coll-of ::where-clause)
+  :ret string?)
+
 (defn soql-where*
   [where*]
   (string/join " AND " (map soql-where where*)))
 
-(t/ann ^:no-check soql-query
-       [sf/SalesforceClient t/Keyword (t/NonEmptyVec FieldPath) (t/Vec WhereClause) -> t/Str])
+(s/fdef soql-query
+  :args (s/cat :client ::sf/client
+               :type ::sc/attr
+               :field-paths (s/coll-of ::sc/field-path :min-count 1)
+               :where (s/coll-of ::where-clause))
+  :ret string?)
+
 (defn soql-query
   "Creates a soql query string for the given client, type, and seq of field
    paths"
@@ -78,15 +88,20 @@
          (when (seq where)
            (str " WHERE " (soql-where* where))))))
 
-(defn update-attr-path [client where]
+(defn update-attr-path
+  [client where]
   (mapv (fn [[op & args :as clause]]
           (case op
             :or `[:or ~@(map (partial update-attr-path client) args)]
             (update clause 1 (fn [path] (resolve-attr-path client (first path) (rest path))))))
         where))
 
-(t/ann ^:no-check query-attr-paths
-       [sf/SalesforceClient t/Keyword (t/NonEmptyVec AttrPath) (t/Vec WhereClause) -> (t/Vec t/Any)])
+(s/fdef query-attr-paths
+  :args (s/cat :client ::sf/client
+               :type ::sc/attr
+               :attr-paths (s/coll-of ::sc/attr-path :min-count 1)
+               :where (s/coll-of ::where-clause)))
+
 (defn query-attr-paths
   "Queries the given client and type for the given seq of attr-paths, e.g.
    [[:account :name] [:account :createdby :lastname]]. This returns a vector
@@ -113,12 +128,14 @@
                 {:url url})))
           records)))
 
-(t/defalias Variant
-  (t/Rec [v]
-         (t/HVec [t/Keyword (t/U t/Keyword v) *])))
+(s/def ::variant
+  (s/coll-of (s/or :attr ::sc/attr :variant ::variant)
+             :kind vector? :min-count 1))
 
-(t/ann ^:no-check expand-variants
-       [Variant -> (t/Vec AttrPath)])
+(s/fdef expand-variants
+  :args (s/cat :variant ::variant)
+  :ret (s/coll-of ::sc/attr-path :kind vector?))
+
 (defn expand-variants
   "Expands a variant path into a seq of attr paths"
   [variant-path]
@@ -130,13 +147,23 @@
             []
             refs)))
 
-(t/defalias Query
-  (t/HMap :mandatory {:find Variant}
-          :optional {:where (t/Vec WhereClause)}
-          :complete? true))
+(s/def ::find
+  ::variant)
 
-(t/ann ^:no-check query
-       [sf/SalesforceClient Query -> (t/Vec t/Any)])
+(s/def ::where
+  (s/coll-of ::where-clause :kind vector?))
+
+(s/def ::query
+  (s/keys :req-un [::find]
+          :opt-un [::where]))
+
+(s/fdef query
+  :args (s/cat :client ::sf/client
+               :query ::query)
+  :ret (s/coll-of map? :kind vector?)
+  ;; TODO :fn specify structure of maps from query find
+  )
+
 (defn query
   "Returns the results of the given query against the given client. The query is
    a map with a :find keyword whose value must be a vector of keywords and
@@ -152,6 +179,10 @@
                 {type record})
               (query-attr-paths client type (map next attr-paths) (:where query)))))))
 
+(s/fdef record-types
+  :args (s/cat :client ::sf/client)
+  :ret (s/map-of ::spec/id string?))
+
 (defn record-types
   [client]
   (let [cache (sf/cache client)]
@@ -162,6 +193,11 @@
                        (into {}))]
           (sf/put! cache ::record-types idx)
           idx))))
+
+(s/fdef record-type-id
+  :args (s/cat :client ::sf/client
+               :name ::spec/type)
+  :ret ::spec/id)
 
 (defn record-type-id
   [client record-type-name]

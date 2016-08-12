@@ -3,24 +3,26 @@
   more Clojure-y keywords."
   (:require [clj-time.coerce :as tc]
             [clj-time.format :as tf]
-            [clojure.core.typed :as t]
+            [clojure.spec :as s]
             [clojure.string :as string]
-            [sails-forth.client :as sf]))
+            [sails-forth.client :as sf]
+            [sails-forth.memory :as memory]
+            [sails-forth.spec :as spec])
+  (:import [org.joda.time DateTime LocalDate]))
 
-(t/defalias Attr
-  "An Attr is a keyword that refers to a Salesforce object or field"
-  t/Keyword)
+(s/def ::attr
+  keyword?)
 
-(t/defalias AttrPath
-  "An AttrPath is a vector of keywords that is resolved against a Salesforce
-   object or database to yield an object or field"
-  (t/NonEmptyVec Attr))
+(s/def ::attr-path
+  (s/coll-of ::attr :kind vector? :min-count 1))
 
-(t/defalias FieldPath
-  (t/NonEmptyVec sf/SalesforceFieldDescription))
+(s/def ::field-path
+  (s/coll-of ::spec/field-description :kind vector? :min-count 1))
 
-(t/ann ^:no-check field->attr
-       [sf/SalesforceFieldDescription -> Attr])
+(s/fdef field->attr
+  :args (s/cat :field ::spec/field-description)
+  :ret ::attr)
+
 (defn field->attr
   "Derives a clojurey attribute keyword representation of a Salesforce field.
    This converts snake case to kebob case, removes any custom field suffix,
@@ -38,8 +40,10 @@
         (string/replace \_ \-)
         keyword)))
 
-(t/ann ^:no-check field->refers-attr
-       [sf/SalesforceFieldDescription -> Attr])
+(s/fdef field->refers-attr
+  :args (s/cat :field ::spec/field-description)
+  :ret ::attr)
+
 (defn field->refers-attr
   "Derives a clojurey attribute keyword representation of the Salesforce
    relation about which this field refers"
@@ -56,8 +60,10 @@
         (string/replace \_ \-)
         keyword)))
 
-(t/ann ^:no-check object->attr
-       [sf/SalesforceObjectOverview -> Attr])
+(s/fdef object->attr
+  :args (s/cat :object ::spec/object-overview)
+  :ret ::attr)
+
 (defn object->attr
   "Derives a clojurey type keyword representation of a Salesforce object.
    This converts snake case to kebob case and removes any custom field suffix."
@@ -69,8 +75,11 @@
         (string/replace #"_{1,2}" "-")
         keyword)))
 
-(t/ann ^:no-check set-map
-       [(t/Seqable (t/HSeq [t/Keyword t/Any])) -> '{}])
+(s/fdef set-map
+  :args (s/and (s/coll-of (s/tuple keyword? any?))
+               #(= (count %) (count (set (map first %)))))
+  :ret (s/map-of keyword? any?))
+
 (defn set-map
   "Builds a map from the given seq of entries, raising on any duplicate key"
   [entries]
@@ -82,8 +91,10 @@
           {}
           entries))
 
-(t/ann ^:no-check get-types
-       [sf/SalesforceClient -> (t/Map Attr sf/SalesforceObjectOverview)])
+(s/fdef get-types
+  :args (s/cat :client ::sf/client)
+  :ret (s/map-of ::attr ::spec/object-overview))
+
 (defn get-types
   "Obtains a map of descriptions by type"
   [client]
@@ -97,8 +108,11 @@
       (sf/put! (sf/cache client) ::types type->object)
       type->object)))
 
-(t/ann ^:no-check get-type-description
-       [sf/SalesforceClient Attr -> (t/Option sf/SalesforceObjectDescription)])
+(s/fdef get-type-description
+  :args (s/cat :client ::sf/client
+               :type ::attr)
+  :ret (s/nilable ::spec/object-description))
+
 (defn get-type-description
   "Obtains the description for a given type and builds some custom indexes
    into it. This will only fetch the type once for a given client."
@@ -129,31 +143,60 @@
             (sf/put! (sf/cache client) ::types (assoc types type updated))
             updated))))))
 
-(t/ann ^:no-check get-fields
-       [sf/SalesforceClient Attr -> (t/Option (t/Map Attr sf/SalesforceFieldDescription))])
+(s/fdef get-fields
+  :args (s/cat :client ::sf/client
+               :type ::attr)
+  :ret (s/nilable (s/map-of ::attr ::spec/field-description)))
+
 (defn get-fields
   "Obtains a map of descriptions by field for the given type"
   [client type]
   (::attr->field (get-type-description client type)))
 
-(t/ann ^:no-check get-field-description
-       [sf/SalesforceClient Attr Attr -> (t/Option sf/SalesforceFieldDescription)])
+(s/fdef get-field-description
+  :args (s/cat :client ::sf/client
+               :type ::attr
+               :attr ::attr)
+  :ret (s/nilable ::spec/field-description))
+
 (defn get-field-description
   "Obtains the description for the given field on a type by its attribute"
   [client type attr]
   (let [type-description (get-type-description client type)]
     (get-in type-description [::attr->field attr])))
 
-(t/ann ^:no-check get-attrs-for-label
-       [sf/SalesforceClient Attr t/Str -> (t/Set Attr)])
+(s/fdef get-attrs-for-label
+  :args (s/cat :client ::sf/client
+               :type ::attr
+               :label string?)
+  :ret (s/coll-of ::attr :kind set?))
+
 (defn get-attrs-for-label
   "Returns the set of attributes on the given type that have the given label"
   [client type label]
   (let [description (get-type-description client type)]
     (get (::label-index description) label)))
 
-(t/ann ^:no-check parse-value
-       [sf/SalesforceFieldDescription t/Any -> t/Any])
+(s/def ::datetime
+  (partial instance? DateTime))
+
+(s/def ::date
+  (partial instance? LocalDate))
+
+(s/def ::value
+  (s/or :datetime ::datetime
+        :date ::date
+        :int integer?
+        :bigdec bigdec?
+        :other ::spec/json-simple))
+
+(s/fdef parse-value
+  :args (s/cat :field ::spec/field-description
+               :value ::spec/json-simple)
+  :ret ::value
+  ;; TODO could specify that render-value is the inverse
+  )
+
 (def parse-value
   "Parses the given value according to its field type and other characteristics"
   (let [date-time-formatter (tf/formatters :date-time)
@@ -173,6 +216,13 @@
           "percent" (/ value 100M)
           value)))))
 
+(s/fdef render-value
+  :args (s/cat :field ::spec/field-description
+               :value ::value)
+  :ret ::spec/json-simple
+  ;; TODO could specify that parse-value is the inverse
+  )
+
 (def render-value
   "Parses the given value according to its field type and other characteristics"
   (let [date-time-formatter (tf/formatters :date-time)
@@ -185,8 +235,12 @@
           "percent" (* value 100M)
           value)))))
 
-(t/ann ^:no-check resolve-attr-path
-       [sf/SalesforceClient Attr AttrPath -> FieldPath])
+(s/fdef resolve-attr-path
+  :args (s/cat :client ::sf/client
+               :type ::attr
+               :attr-path ::attr-path)
+  :ret ::field-path)
+
 (defn resolve-attr-path
   "Resolves a path of attrs against a given type, returning a path of fields.
    All but the last attr in a path must resolve to a reference type."
@@ -207,8 +261,10 @@
                attr-path'
                (conj fields field))))))
 
-(t/ann ^:no-check resolve-field-path
-       [FieldPath -> AttrPath])
+(s/fdef resolve-field-path
+  :args (s/cat :field-path ::field-path)
+  :ret ::attr-path)
+
 (defn resolve-field-path
   "Derives a seq of record keys for the given seq of fields, suitable for
    applying to the result of the underlying query! fn"
@@ -228,6 +284,11 @@
                                     (:name field)))]
           (recur (conj record-path record-key)
                  field-path'))))))
+
+(s/fdef schema
+  :args (s/cat :client ::sf/client
+               :types (s/coll-of ::attr))
+  :ret ::memory/schema)
 
 (defn schema
   [client types]

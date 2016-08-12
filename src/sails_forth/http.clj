@@ -1,56 +1,46 @@
 (ns sails-forth.http
   (:require [cheshire.parse]
             [clj-http.client :as http]
-            [clojure.core.typed :as t]
-            [clojure.core.typed.unsafe :as tu]))
+            [clojure.spec :as s]
+            [sails-forth.spec :as spec]))
 
-(t/defalias HttpMethod
-  (t/U ':get ':post ':patch ':put ':delete))
+(def http-methods
+  #{:get :post :patch :put :delete})
 
-(t/defalias HttpUrl
-  t/Str)
+(s/def ::method
+  http-methods)
 
-(t/defalias HttpParams
-  (t/Map t/Keyword t/Any))
+(s/def ::url
+  string?)
 
-(t/defalias HttpStatus
-  t/Int)
+(s/def ::param
+  (s/map-of keyword? any?))
 
-(t/defalias Json
-  (t/Rec [v]
-         (t/U t/Str
-              t/Num
-              t/Bool
-              (t/Value nil)
-              (t/Vec v)
-              (t/Map t/Keyword v))))
+(s/def ::status
+  (s/int-in 100 600))
 
-(t/defalias JsonMap
-  (t/Map t/Keyword Json))
+(s/def ::body
+  ::spec/json-map)
 
-(t/defalias HttpBody
-  Json)
+(s/def ::headers
+  (s/map-of string? string?))
 
-(t/defalias HttpHeaders
-  (t/Map t/Str t/Str))
+(s/def ::request
+  (s/keys :req-un [::method ::url]))
 
-(t/defalias HttpRequest
-  (t/HMap :mandatory {:method HttpMethod
-                      :url HttpUrl}))
+(s/def ::response
+  (s/keys ::req-un [::status]
+          ::opt-un [::body ::headers]))
 
-(t/defalias HttpResponse
-  (t/HMap :mandatory {:status HttpStatus}
-          :optional {:body HttpBody
-                     :headers HttpHeaders}))
+(s/fdef json-request
+  :args (s/cat :method ::method
+               :headers ::headers
+               :url ::url
+               :params (s/nilable ::params))
+  :ret ::response)
 
-(t/ann ^:no-check clj-http.client/request [HttpRequest -> HttpResponse])
-(t/ann ^:no-check cheshire.parse/*use-bigdecimals?* t/Bool)
-
-(t/defn json-request
-  [method :- HttpMethod
-   headers :- HttpHeaders
-   url :- HttpUrl
-   params :- (t/Option HttpParams)] :- HttpResponse
+(defn json-request
+  [method headers url params]
   (let [request (cond-> {:method method
                          :url url
                          :throw-exceptions false
@@ -70,32 +60,76 @@
     (binding [cheshire.parse/*use-bigdecimals?* true]
       (http/request request))))
 
-(t/defalias Authentication
-  (t/HMap :mandatory {:instance_url t/Str
-                      :access_token t/Str}))
+(s/def ::instance_url
+  ::url)
 
-(t/defalias Config
-  (t/HMap :mandatory {:username t/Str
-                      :password t/Str
-                      :token t/Str
-                      :consumer-key t/Str
-                      :consumer-secret t/Str}
-          :optional {:version t/Int
-                     :sandbox? t/Bool
-                     :host t/Str
-                     :read-only? t/Bool}))
+(s/def ::access_token
+  string?)
 
-(t/defalias State
-  (t/HMap :mandatory {:host t/Str
-                      :authentication (t/Option Authentication)
-                      :version-url (t/Option HttpUrl)
-                      :requests t/Int
-                      :read-only? t/Bool
-                      :config Config}
-          :complete? true))
+(s/def ::authentication
+  (s/keys :req-un [::instance_url
+                   ::access_token]))
 
-(t/defn authenticate
-  [config :- Config] :- (t/Option Authentication)
+(s/def ::username
+  string?)
+
+(s/def ::password
+  string?)
+
+(s/def ::token
+  string?)
+
+(s/def ::consumer-key
+  string?)
+
+(s/def ::consumer-secret
+  string?)
+
+(s/def ::version
+  string?)
+
+(s/def ::sandbox?
+  boolean?)
+
+(s/def ::host
+  string?)
+
+(s/def read-only?
+  boolean?)
+
+(s/def ::config
+  (s/keys :req-un [::username
+                   ::password
+                   ::token
+                   ::consumer-key
+                   ::consumer-secret]
+          :opt-un [::version
+                   ::sandbox?
+                   ::host
+                   ::read-only?]))
+
+(s/def ::version-url
+  (s/nilable ::url))
+
+(s/def ::requests
+  (s/or :zero zero?
+        :pos pos-int?))
+
+(s/def ::state
+  (s/keys :req-un [::host
+                   ::requests
+                   ::read-only?
+                   ::config]
+          :opt-un [::authentication
+                   ::version-url
+                   ::version]))
+
+(s/fdef authenticate
+  :args (s/cat :config ::config)
+  :ret (s/nilable ::authentication))
+
+(defn authenticate
+  [config]
   (let [{:keys [host username password token consumer-key consumer-secret]} config
         params {:username username
                 :password (str password token)
@@ -114,29 +148,48 @@
         response (http/request request)
         {:keys [status body]} response]
     (when (and (= 200 status)
-               ((t/pred Authentication) body))
+               (s/valid? ::authentication body))
       body)))
 
-(t/defalias Version
-  (t/HMap :mandatory {:url HttpUrl}))
+(s/def ::version-map
+  (s/keys :req-un [::url
+                   ::version]))
 
-(t/ann ^:no-check versions [t/Str -> (t/Option (t/Vec HttpUrl))])
+(s/def ::versions
+  (s/coll-of ::version-map))
+
+(s/fdef versions
+  :args (s/cat :url ::url)
+  :ret (s/nilable ::version))
+
 (defn versions
   [url]
   (let [url (str url "/services/data/")
         response (json-request :get {} url nil)
         {:keys [status body]} response]
     (when (and (= 200 status)
-               ((t/pred (t/Seq Version)) body))
-      (mapv #(get % :url) body))))
+               (s/valid? ::versions body))
+      body)))
 
-(t/defn derive-host
-  [config :- Config] :- t/Str
+(s/def ::api-hosts
+  #{"test.salesforce.com" "login.salesforce.com"})
+
+(s/fdef derive-host
+  :args (s/cat :config ::config)
+  :ret (s/or :implied ::api-hosts
+             :given ::host))
+
+(defn derive-host
+  [config]
   (let [{:keys [sandbox? host]} config]
     (or host (if sandbox? "test.salesforce.com" "login.salesforce.com"))))
 
-(t/defn build-state
-  [config :- Config] :- State
+(s/fdef build-state
+  :args (s/cat :config ::config)
+  :ret ::state)
+
+(defn build-state
+  [config]
   (let [{:keys [version]} config
         host (derive-host config)
         read-only? (get config :read-only? false)]
@@ -148,27 +201,47 @@
              :config (assoc config :host host)}
       version (assoc :version-url (str "/services/data/v" version)))))
 
-(t/defn try-authentication
-  [state :- State] :- State
+(s/fdef try-authentication
+  :args (s/cat :state ::state)
+  :ret ::state)
+
+(defn try-authentication
+  [state]
   (let [{:keys [authentication config requests]} state]
     (cond-> state
       (not authentication)
       (assoc :authentication (authenticate config)
              :requests (inc requests)))))
 
-(t/defn try-to-find-latest-version
-  [state :- State] :- State
-  (let [{:keys [authentication requests version-url]} state]
+(s/fdef try-to-find-latest-version
+  :args (s/cat :state ::state)
+  :ret ::state)
+
+(defn try-to-find-latest-version
+  [state]
+  (let [{:keys [authentication requests version version-url]} state
+        last-version (when (and (not (and version version-url))
+                                authentication)
+                       (last (versions (:instance_url authentication))))]
     (cond-> state
-      (and (not version-url) authentication)
-      (assoc :version-url (last (versions (:instance_url authentication)))
+      last-version
+      (assoc :version-url (:url last-version)
+             :version (:version last-version)
              :requests (inc requests)))))
 
-(t/defn request
-  [state :- State
-   method :- HttpMethod
-   url :- HttpUrl
-   params :- HttpParams] :- (t/HVec [State (t/Option HttpResponse)])
+(s/def ::service
+  #{:data :async})
+
+(s/fdef request
+  :args (s/cat :state ::state
+               :method ::method
+               :service ::service
+               :url ::url
+               :params ::params)
+  :ret (s/tuple ::state (s/nilable ::response)))
+
+(defn request
+  [state method service url params]
   (when (and (:read-only? state)
              (case method
                :post true
@@ -181,18 +254,22 @@
                 :params params}
           message "Read-only clients may not issue requests with side effects"]
       (throw (ex-info message data))))
-  (t/loop [state :- State state
-           tries :- t/Int 0]
+  (loop [state state
+         tries 0]
     (let [state (-> state
                     try-authentication
                     try-to-find-latest-version)
-          {:keys [authentication requests version-url]} state
+          {:keys [authentication requests version version-url]} state
           response (when-let [{:keys [access_token instance_url]} authentication]
-                     (let [url (if (and version-url
-                                        (.startsWith ^String url version-url))
-                                 (str instance_url url)
-                                 (str instance_url version-url url))
-                           headers {"Authorization" (str "Bearer " access_token)}]
+                     (let [[url-pattern headers]
+                           ;; Salesforce: not a shining example of consistency
+                           (case service
+                             :data ["%s/services/%s/v%s%s"
+                                    {"Authorization" (str "Bearer " access_token)}]
+                             :async ["%s/services/%s/%s%s"
+                                     {"X-SFDC-Session" access_token}])
+                           url (format url-pattern
+                                       instance_url (name service) version url)]
                        (json-request method headers url params)))
           {:keys [status body]} response
           state (cond-> state
@@ -203,33 +280,31 @@
         (recur (assoc state :authentication nil) (inc tries))
         [state response]))))
 
-(t/defalias SalesforceClient
-  (t/Atom1 State))
+(s/def ::client
+  (s/and (partial instance? clojure.lang.Atom)
+         (comp (partial s/valid? ::state) deref)))
 
-(t/defn request!
+(s/fdef request!
+  :args (s/cat :client ::client
+               :method ::method
+               :service ::service
+               :url ::url
+               :params ::params)
+  :ret (s/nilable ::response))
+
+(defn request!
   "Issue the given request using the given client"
-  [client :- SalesforceClient
-   method :- HttpMethod
-   url :- HttpUrl
-   params :- HttpParams] :- (t/Option HttpResponse)
-  (let [[client' response] (request @client method url params)]
+  [client method service url params]
+  (let [[client' response] (request @client method service url params)]
     ;; TODO could try to merge states, otherwise request count may be incorrect
     (reset! client client')
     response))
 
-(t/defalias SalesforceId
-  t/Str)
+(s/fdef build-client!
+  :args (s/cat :config ::config)
+  :ret ::client)
 
-(t/defalias SalesforceType
-  t/Str)
-
-(t/defalias SalesforceAttrs
-  (t/Map t/Keyword t/Str))
-
-(t/defalias SalesforceQuery
-  t/Str)
-
-(t/defn build-client!
+(defn build-client!
   "Creates a stateful Salesforce client from the given config. The client
    authenticates lazily and uses the latest Salesforce version if none is
    specified. If an authenticated request receives an invalid authentication
@@ -241,25 +316,26 @@
 
    This fn explicitly makes no guarantees regarding the type of the client
    entity, other than it can be used with the user-facing fns in this ns."
-  [config :- Config] :- SalesforceClient
+  [config]
   (atom (build-state config)))
 
-(t/defalias SalesforceEntity
-  (t/HMap :mandatory {:id SalesforceId}))
+(s/fdef create!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :attrs ::spec/attrs)
+  :ret ::spec/id)
 
-(t/defn create!
+(defn create!
   "Creates an object of the given type and attrs using the given salesforce
    client. If salesforce responds successfully, this returns the object's id,
    otherwise this raises an exception."
-  [client :- SalesforceClient
-   type :- SalesforceType
-   attrs :- SalesforceAttrs] :- SalesforceId
+  [client type attrs]
   (let [url (str "/sobjects/" type)
-        response (request! client :post url attrs)
+        response (request! client :post :data url attrs)
         {:keys [status body]} response]
     (if (and (= 201 status)
-             ((t/pred SalesforceEntity) body))
-      (get (tu/ignore-with-unchecked-cast body SalesforceEntity) :id)
+             (s/valid? ::spec/entity body))
+      (get body :id)
       (let [data {:type type
                   :attrs attrs
                   :status status
@@ -270,14 +346,18 @@
                       "Invalid salesforce response")]
         (throw (ex-info message data))))))
 
-(t/defn delete!
+(s/fdef delete!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :id ::spec/id)
+  :ret boolean?)
+
+(defn delete!
   "Deletes the object of the given type with the given id. This returns true
    if it succeeds and raises an exception otherwise."
-  [client :- SalesforceClient
-   type :- SalesforceType
-   id :- SalesforceId] :- (t/Value true)
+  [client type id]
   (let [url (str "/sobjects/" type "/" id)
-        response (request! client :delete url {})
+        response (request! client :delete :data url {})
         {:keys [status body]} response]
     (if (= 204 status)
       true
@@ -290,15 +370,19 @@
                       "Invalid salesforce response")]
         (throw (ex-info message data))))))
 
-(t/defn update!
+(s/fdef update!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :id ::spec/id
+               :attrs ::spec/attrs)
+  :ret boolean?)
+
+(defn update!
   "Updates the object of the given type with the given id. This returns true
    if it succeeds and raises an exception otherwise."
-  [client :- SalesforceClient
-   type :- SalesforceType
-   id :- SalesforceId
-   attrs :- SalesforceAttrs] :- (t/Value true)
+  [client type id attrs]
   (let [url (str "/sobjects/" type "/" id)
-        response (request! client :patch url attrs)
+        response (request! client :patch :data url attrs)
         {:keys [status body]} response]
     (if (= 204 status)
       true
@@ -311,15 +395,18 @@
                       "Invalid salesforce response")]
         (throw (ex-info message data))))))
 
-(t/defn list!
-  [client :- SalesforceClient
-   type :- SalesforceType] :- (t/Option JsonMap)
+(s/fdef list!
+  :args (s/cat :client ::spec/client
+               :type ::spec/type)
+  :ret (s/nilable ::spec/json-map))
+
+(defn list!
+  [client type]
   (let [url (str "/sobjects/" type)
-        response (request! client :get url {})
+        response (request! client :get :data url {})
         {:keys [status body]} response]
-    ;; TODO t/cast doesn't work with Json or JsonMap
     (cond (and (= 200 status)
-               ((t/pred JsonMap) body))
+               (s/valid? ::spec/json-map body))
           body
           (= 404 status)
           nil
@@ -330,29 +417,18 @@
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
-(t/defalias SalesforceFieldDescription
-  (t/HMap :mandatory {:name t/Str
-                      :type t/Str
-                      :referenceTo (t/Vec t/Str)
-                      :scale t/AnyInteger
-                      :precision t/AnyInteger
-                      :label t/Str
-                      :relationshipName t/Any}))
+(s/fdef describe!
+  :args (s/cat :client ::client
+               :type ::spec/type)
+  :ret (s/nilable ::spec/object-description))
 
-(t/defalias SalesforceObjectDescription
-  (t/HMap :mandatory {:name t/Str
-                      :label t/Str
-                      :custom t/Bool
-                      :fields (t/Vec SalesforceFieldDescription)}))
-
-(t/defn describe!
-  [client :- SalesforceClient
-   type :- SalesforceType] :- (t/Option SalesforceObjectDescription)
+(defn describe!
+  [client type]
   (let [url (str "/sobjects/" type "/describe")
-        response (request! client :get url {})
+        response (request! client :get :data url {})
         {:keys [status body]} response]
     (cond (and (= 200 status)
-               ((t/pred SalesforceObjectDescription) body))
+               (s/valid? ::spec/object-description body))
           body
           (= 404 status)
           nil
@@ -363,103 +439,183 @@
                 message "Could not retrieve description of salesforce object"]
             (throw (ex-info message data))))))
 
-(t/defalias SalesforceObjectOverview
-  (t/HMap :mandatory {:name t/Str
-                      :label t/Str
-                      :custom t/Bool}))
+(s/fdef objects!
+  :args (s/cat :client ::client)
+  :ret ::spec/objects-overview)
 
-(t/defalias SalesforceObjectsOverview
-  (t/HMap :mandatory {:sobjects (t/Vec SalesforceObjectOverview)}))
-
-(t/defn objects!
-  [client :- SalesforceClient] :- SalesforceObjectsOverview
+(defn objects!
+  [client]
   (let [url "/sobjects"
-        response (request! client :get url {})
+        response (request! client :get :data url {})
         {:keys [status body]} response]
     (cond (and (= 200 status)
-               ((t/pred SalesforceObjectsOverview) body))
-          (tu/ignore-with-unchecked-cast body SalesforceObjectsOverview)
+               (s/valid? ::spec/objects-overview body))
+          body
           :else
           (let [data {:status status
                       :body body}
                 message "Could not retrieve list of salesforce objects"]
             (throw (ex-info message data))))))
 
-(t/defalias SalesforceQueryResults
-  (t/U (t/HMap :mandatory {:done (t/Value true)
-                           :totalSize t/AnyInteger
-                           :records (t/Vec JsonMap)})
-       (t/HMap :mandatory {:done (t/Value false)
-                           :totalSize t/AnyInteger
-                           :records (t/Vec JsonMap)
-                           :nextRecordsUrl HttpUrl})))
+(s/fdef query!
+  :args (s/cat :client ::client
+               :query ::spec/query)
+  :ret ::spec/records)
 
-(t/defn query!
+(defn query!
   "Executes the given query and returns all results, eagerly fetching if there
    is pagination"
-  [client :- SalesforceClient
-   query :- SalesforceQuery] :- (t/Vec JsonMap)
+  [client query]
   (let [url "/query"
         params {:q query}
-        response (request! client :get url params)]
-    (t/loop [response :- (t/Option HttpResponse) response
-             results :- (t/Vec JsonMap) []]
+        response (request! client :get :data url params)]
+    (loop [response response
+           results []]
       (let [{:keys [status body]} response]
         (if (and (= 200 status)
-                 ((t/pred SalesforceQueryResults) body))
-          (let [body (tu/ignore-with-unchecked-cast body SalesforceQueryResults)
-                results (into results (get body :records))]
+                 (s/valid? ::spec/query-results body))
+          (let [results (into results (get body :records))]
             (if (get body :done)
               results
               (let [url (get body :nextRecordsUrl)]
-                (recur (request! client :get url {}) results))))
+                (recur (request! client :get :data url {}) results))))
           (let [data {:query query
                       :status status
                       :body body}
                 message "Could not execute salesforce query"]
             (throw (ex-info message data))))))))
 
-;; :records could be (t/Value []) but t/pred doesn't work on that
-(t/defalias SalesforceCountQueryResults
-  (t/HMap :mandatory {:done (t/Value true)
-                      :totalSize t/AnyInteger
-                      :records (t/Vec t/Nothing)}))
+(s/fdef count!
+  :args (s/cat :client ::client
+               :query ::spec/query)
+  :ret nat-int?)
 
-(t/defn count!
+(defn count!
   "Executes the given query and returns the total number of results.
    This is intended for use with COUNT() queries."
-  [client :- SalesforceClient
-   query :- SalesforceQuery] :- t/AnyInteger
+  [client query]
   (let [url "/query"
         params {:q query}
-        response (request! client :get url params)]
+        response (request! client :get :data url params)]
     (let [{:keys [status body]} response]
       (if (and (= 200 status)
-               ((t/pred SalesforceCountQueryResults) body))
-        (let [body (tu/ignore-with-unchecked-cast body SalesforceCountQueryResults)]
-          (get body :totalSize))
+               (s/valid? ::spec/count-query-results body))
+        (get body :totalSize)
         (let [data {:query query
                     :status status
                     :body body}
               message "Could not execute salesforce count query"]
           (throw (ex-info message data)))))))
 
-(t/defalias SalesforceLimit
-  (t/HMap :mandatory {:Max t/AnyInteger
-                      :Remaining t/AnyInteger}
-          :complete? true))
+(s/fdef limits!
+  :args (s/cat :client ::client)
+  :ret ::spec/limits)
 
-(t/defalias SalesforceLimits
-  (t/Map t/Keyword SalesforceLimit))
-
-(t/defn limits!
-  [client :- SalesforceClient] :- SalesforceLimits
-  (let [response (request! client :get "/limits" {})
+(defn limits!
+  [client]
+  (let [response (request! client :get :data "/limits" {})
         {:keys [status body]} response]
     (if (and (= 200 status)
-             ((t/pred SalesforceLimits) body))
-      (tu/ignore-with-unchecked-cast body SalesforceLimits)
+             (s/valid? ::spec/limits body))
+      body
       (let [data {:status status
                   :body body}
             message "Could not find salesforce limits"]
         (throw (ex-info message data))))))
+
+(s/def ::job-operation
+  #{:insert})
+
+(s/def :sails-forth.http.job/state
+  #{"Open" "Closed"})
+
+(s/def ::job
+  (s/keys :req-un [::spec/id
+                   :sails-forth.http.job/state]))
+
+(s/fdef create-import-job!
+  :args (s/cat :client ::client
+               :type ::spec/type
+               :operation ::job-operation)
+  :ret (s/nilable ::spec/id))
+
+(defn create-import-job!
+  [client type operation]
+  (let [params {:operation (name operation)
+                :object type
+                :contentType "JSON"}
+        response (request! client :post :async "/job" params)
+        {:keys [status body]} response]
+    (when (and (= 201 status)
+               (s/valid? ::job body)
+               (= "Open" (:state body)))
+      (:id body))))
+
+(s/fdef close-import-job!
+  :args (s/cat :client ::client
+               :id ::spec/id)
+  :ret (s/nilable true?))
+
+(defn close-import-job!
+  [client id]
+  (let [params {:state "Closed"}
+        response (request! client :post :async (str "/job/" id) params)
+        {:keys [status body]} response]
+    (when (and (= 200 status)
+               (s/valid? ::job body)
+               (= "Closed" (:state body)))
+      true)))
+
+(s/def ::batch
+  (s/keys :req-un [::spec/id]))
+
+(s/fdef add-import-batch!
+  :args (s/cat :client ::client
+               :id ::spec/id
+               :records (s/coll-of ::spec/attrs))
+  :ret ::spec/id)
+
+(defn add-import-batch!
+  [client id records]
+  (let [url (str "/job/" id "/batch")
+        response (request! client :post :async url records)
+        {:keys [status body]} response]
+    (when (and (= 201 status)
+               (s/valid? ::batch body))
+      (:id body))))
+
+(s/def ::success
+  boolean?)
+
+(s/def ::created
+  boolean?)
+
+(s/def ::batch-results
+  (s/coll-of (s/keys :req-un [::success])))
+
+(defn get-batch-results!
+  [client job-id batch-id]
+  (let [url (str "/job/" job-id "/batch/" batch-id "/result")
+        response (request! client :get :async url {})
+        {:keys [status body]} response]
+    (when (and (= 200 status)
+               (s/valid? ::batch-results body))
+      body)))
+
+(def import-poll-timeout-ms
+  (* 60 1000))
+
+(def import-total-tries
+  10)
+
+(defn import!
+  [client type records]
+  (let [job-id (create-import-job! client type :insert)
+        batch-id (when job-id
+                   (add-import-batch! client job-id records))]
+    (when (and batch-id (close-import-job! client job-id))
+      (delay (loop [tries 0]
+               (or (get-batch-results! client job-id batch-id)
+                   (when (< tries import-total-tries)
+                     (Thread/sleep import-poll-timeout-ms)
+                     (recur (inc tries)))))))))

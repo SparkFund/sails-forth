@@ -1,3 +1,8 @@
+## 0.5.0
+
+* Replace core.typed with clojure.spec
+* Add import! fn, using the bulk api
+
 ## 0.4.1
 
 * Add record-type-id fn and record-types cache
