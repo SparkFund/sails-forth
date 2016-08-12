@@ -14,7 +14,9 @@
                       {:description sf-type})))
     sf-type-name))
 
-(defn- sf-attrs
+(defn sf-attrs
+  "Converts the given record to a map of salesforce attrs for the given object
+   type"
   [client type record]
   (->> (for [[k v] record
              :let [desc (get-field-description client type k)
