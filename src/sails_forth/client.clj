@@ -58,8 +58,8 @@
     [_]
     "Returns a persistent cache")
   (import!
-    [_ type data options]
-    "Imports the given data into the given type according to the given options"))
+    [_ type records]
+    "Imports the given records into the given type"))
 
 (s/def ::client
   (partial satisfies? Client))
@@ -114,11 +114,11 @@
 (s/fdef import!
   :args (s/cat :client ::client
                :type ::spec/type
-               :data (s/coll-of ::spec/attrs)
-               :options (s/map-of keyword? any?))
-  :ret (s/coll-of boolean? :kind vector?)
+               :records (s/coll-of ::spec/attrs))
+  :ret (s/and (partial instance? clojure.lang.IDeref)
+              (comp (partial s/valid? (s/coll-of any?)) deref))
   :fn (fn [{:keys [args ret]}]
-        (= (count (:data args)) (count ret))))
+        (= (count (:data args)) (count @ret))))
 
 (s/fdef build-atomic-cache
   :args (s/cat)
@@ -160,6 +160,8 @@
         (http/count! client query))
       (limits! [_]
         (http/limits! client))
+      (import! [_ type records]
+        (http/import! client type records))
       (cache [_]
         cache))))
 
@@ -190,6 +192,8 @@
         (memory/count! client query))
       (limits! [_]
         (memory/limits! client))
+      (import! [_ type records]
+        (future (mapv (partial create! type) records)))
       (cache [_]
         cache))))
 

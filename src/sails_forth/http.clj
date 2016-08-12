@@ -543,7 +543,7 @@
   [client type operation]
   (let [params {:operation (name operation)
                 :object type
-                :contentType "CSV"}
+                :contentType "JSON"}
         response (request! client :post :async "/job" params)
         {:keys [status body]} response]
     (when (and (= 201 status)
@@ -553,12 +553,11 @@
 
 (s/fdef close-import-job!
   :args (s/cat :client ::client
-               :type ::spec/type
                :id ::spec/id)
   :ret (s/nilable true?))
 
 (defn close-import-job!
-  [client type id]
+  [client id]
   (let [params {:state "Closed"}
         response (request! client :post :async (str "/job/" id) params)
         {:keys [status body]} response]
@@ -566,3 +565,57 @@
                (s/valid? ::job body)
                (= "Closed" (:state body)))
       true)))
+
+(s/def ::batch
+  (s/keys :req-un [::spec/id]))
+
+(s/fdef add-import-batch!
+  :args (s/cat :client ::client
+               :id ::spec/id
+               :records (s/coll-of ::spec/attrs))
+  :ret ::spec/id)
+
+(defn add-import-batch!
+  [client id records]
+  (let [url (str "/job/" id "/batch")
+        response (request! client :post :async url records)
+        {:keys [status body]} response]
+    (when (and (= 201 status)
+               (s/valid? ::batch body))
+      (:id body))))
+
+(s/def ::success
+  boolean?)
+
+(s/def ::created
+  boolean?)
+
+(s/def ::batch-results
+  (s/coll-of (s/keys :req-un [::success])))
+
+(defn get-batch-results!
+  [client job-id batch-id]
+  (let [url (str "/job/" job-id "/batch/" batch-id "/result")
+        response (request! client :get :async url {})
+        {:keys [status body]} response]
+    (when (and (= 200 status)
+               (s/valid? ::batch-results body))
+      body)))
+
+(def import-poll-timeout-ms
+  (* 60 1000))
+
+(def import-total-tries
+  10)
+
+(defn import!
+  [client type records]
+  (let [job-id (create-import-job! client type :insert)
+        batch-id (when job-id
+                   (add-import-batch! client job-id records))]
+    (when (and batch-id (close-import-job! client job-id))
+      (delay (loop [tries 0]
+               (or (get-batch-results! client job-id batch-id)
+                   (when (< tries import-total-tries)
+                     (Thread/sleep import-poll-timeout-ms)
+                     (recur (inc tries)))))))))
