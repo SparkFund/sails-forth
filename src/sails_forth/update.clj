@@ -2,12 +2,12 @@
   "Execute SalesForce updates using more idiomatic Clojure syntax."
   (:require [clojure.spec :as s]
             [sails-forth.client :as sf]
-            [sails-forth.clojurify :as sc :refer :all]
+            [sails-forth.clojurify :as sc]
             [sails-forth.spec :as spec]))
 
 (defn- get-sf-type-name
   [client type]
-  (let [sf-type (get-type-description client type)
+  (let [sf-type (sf/get-type-description client type)
         sf-type-name (:name sf-type)]
     (when-not sf-type-name
       (throw (ex-info (str "no SalesForce type for " type)
@@ -19,12 +19,12 @@
    type"
   [client type record]
   (->> (for [[k v] record
-             :let [desc (get-field-description client type k)
+             :let [desc (sf/get-field-description client type k)
                    sf-k (:name desc)]]
          (do (when-not desc
                (throw (ex-info (str "no SalesForce attribute for " k)
                                {:description desc})))
-             [sf-k (render-value desc v)]))
+             [sf-k (sc/render-value desc v)]))
        (into {})))
 
 (s/fdef update!

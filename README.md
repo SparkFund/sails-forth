@@ -6,7 +6,7 @@ version detection.
 
 ## Installation
 
-`sparkfund/sails-forth 0.5.0-SNAPSHOT`
+`sparkfund/sails-forth 0.5.0`
 
 ## Usage
 
@@ -57,9 +57,7 @@ including =, AND, OR, and IN, though adding support for more operators is very
 straightforward.
 
 ``` clojure
-(require '[sails-forth.clojurify :as sc])
-
-(def mc (sf/build-memory-client (sc/schema client #{:contact})))
+(def mc (sf/build-memory-client (sf/schema client #{:contact})))
 ```
 
 ## Configuration

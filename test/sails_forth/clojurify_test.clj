@@ -62,13 +62,13 @@
 
 (deftest ^:integration test-get-field-description
   (let [client (sf/build-http-client (test/load-config))]
-    (is (get-field-description client :opportunity :id))
-    (is (get-field-description client :payment :opportunity))))
+    (is (sf/get-field-description client :opportunity :id))
+    (is (sf/get-field-description client :payment :opportunity))))
 
 (deftest ^:integration test-resolve-attr-path
   (let [client (sf/build-http-client (test/load-config))]
-    (is (resolve-attr-path client :opportunity [:id]))
-    (is (resolve-attr-path client :opportunity [:counterparty-account :id]))
-    (is (resolve-attr-path client :opportunity [:counterparty-account :recordtype :name]))
-    (is (resolve-attr-path client :payment [:opportunity :id]))
-    (is (resolve-attr-path client :payment [:project-schedule :id]))))
+    (is (sf/resolve-attr-path client :opportunity [:id]))
+    (is (sf/resolve-attr-path client :opportunity [:counterparty-account :id]))
+    (is (sf/resolve-attr-path client :opportunity [:counterparty-account :recordtype :name]))
+    (is (sf/resolve-attr-path client :payment [:opportunity :id]))
+    (is (sf/resolve-attr-path client :payment [:project-schedule :id]))))
