@@ -2,7 +2,8 @@
   (:require [clojure.spec :as s]
             [sails-forth.http :as http]
             [sails-forth.memory :as memory]
-            [sails-forth.spec :as spec]))
+            [sails-forth.spec :as spec]
+            [sails-forth.clojurify :as clj]))
 
 (defprotocol Cache
   (put! [_ key value])
@@ -200,3 +201,166 @@
 (defn client?
   [x]
   (and (extends? Client (class x)) x))
+
+(s/fdef get-types
+  :args (s/cat :client ::client)
+  :ret (s/map-of ::attr ::spec/object-overview))
+
+(defn get-types
+  "Obtains a map of descriptions by type"
+  [client]
+  (if-let [types (get! (cache client) ::types)]
+    types
+    (let [objects (objects! client)
+          {:keys [sobjects]} objects
+          type->object (->> sobjects
+                            (map (juxt clj/object->attr identity))
+                            clj/set-map)]
+      (put! (cache client) ::types type->object)
+      type->object)))
+
+(s/fdef get-type-description
+  :args (s/cat :client ::client
+               :type ::attr)
+  :ret (s/nilable ::spec/object-description))
+
+(defn get-type-description
+  "Obtains the description for a given type and builds some custom indexes
+   into it. This will only fetch the type once for a given client."
+  [client type]
+  (let [types (get-types client)]
+    (when-let [overview (type types)]
+      (if (:fields overview)
+        overview
+        (when-let [description (describe! client (:name overview))]
+          (let [{:keys [fields]} description
+                attr->field (->> fields
+                                 (map (juxt clj/field->attr identity))
+                                 clj/set-map)
+                field-index (->> fields
+                                 (map (juxt (comp keyword :name) identity))
+                                 clj/set-map)
+                label-index (reduce (fn [accum field]
+                                      (let [attr (clj/field->attr field)
+                                            {:keys [label]} field]
+                                        (update accum label (fnil conj #{}) attr)))
+                                    {}
+                                    fields)
+                description (assoc description
+                                   ::attr->field attr->field
+                                   ::field-index field-index
+                                   ::label-index label-index)
+                updated (merge overview description)]
+            (put! (cache client) ::types (assoc types type updated))
+            updated))))))
+
+(s/fdef get-fields
+  :args (s/cat :client ::client
+               :type ::attr)
+  :ret (s/nilable (s/map-of ::attr ::spec/field-description)))
+
+(defn get-fields
+  "Obtains a map of descriptions by field for the given type"
+  [client type]
+  (::attr->field (get-type-description client type)))
+
+(s/fdef get-field-description
+  :args (s/cat :client ::client
+               :type ::attr
+               :attr ::attr)
+  :ret (s/nilable ::spec/field-description))
+
+(defn get-field-description
+  "Obtains the description for the given field on a type by its attribute"
+  [client type attr]
+  (let [type-description (get-type-description client type)]
+    (get-in type-description [::attr->field attr])))
+
+(s/fdef get-attrs-for-label
+  :args (s/cat :client ::client
+               :type ::attr
+               :label string?)
+  :ret (s/coll-of ::attr :kind set?))
+
+(defn get-attrs-for-label
+  "Returns the set of attributes on the given type that have the given label"
+  [client type label]
+  (let [description (get-type-description client type)]
+    (get (::label-index description) label)))
+
+(s/fdef resolve-attr-path
+  :args (s/cat :client ::client
+               :type ::attr
+               :attr-path ::attr-path)
+  :ret ::clj/field-path)
+
+(defn resolve-attr-path
+  "Resolves a path of attrs against a given type, returning a path of fields.
+   All but the last attr in a path must resolve to a reference type."
+  [client type attr-path]
+  (loop [type type
+         attr-path attr-path
+         fields []]
+    (if-not (seq attr-path)
+      fields
+      (let [attr (first attr-path)
+            field (get-field-description client type attr)
+            attr-path' (next attr-path)]
+        (when-not field
+          (throw (ex-info "Invalid attr path" {:attr-path attr-path
+                                               :type type})))
+        (recur (when attr-path'
+                 (clj/field->refers-attr field))
+               attr-path'
+               (conj fields field))))))
+
+(s/fdef resolve-field-path
+  :args (s/cat :field-path ::field-path)
+  :ret ::clj/attr-path)
+
+(defn resolve-field-path
+  "Derives a seq of record keys for the given seq of fields, suitable for
+   applying to the result of the underlying query! fn"
+  [field-path]
+  (loop [record-path []
+         field-path field-path]
+    (if-not (seq field-path)
+      record-path
+      (let [field (first field-path)
+            field-path' (next field-path)]
+        (when (and (not field-path')
+                   (= "reference" (:type field)))
+          (throw (ex-info "Invalid field path"
+                          {:field-path field-path})))
+        (let [record-key (keyword (if (= "reference" (:type field))
+                                    (:relationshipName field)
+                                    (:name field)))]
+          (recur (conj record-path record-key)
+                 field-path'))))))
+
+(s/fdef schema
+  :args (s/cat :client ::client
+               :types (s/coll-of ::attr))
+  :ret ::memory/schema)
+
+(defn schema
+  [client types]
+  (let [type-attrs #{:name :label :custom :fields}
+        field-attrs #{:name
+                      :type
+                      :referenceTo
+                      :scale
+                      :precision
+                      :label
+                      :relationshipName
+                      :picklistValues
+                      :nillable
+                      :defaultValue}
+        all-types (get-types client)]
+    (into {}
+          (for [type types]
+            (let [type-name ((comp :name all-types) type)
+                  type-schema (-> (describe! client type-name)
+                                  (select-keys type-attrs)
+                                  (update :fields (partial map #(select-keys % field-attrs))))]
+              [type-name type-schema])))))

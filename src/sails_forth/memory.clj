@@ -2,7 +2,8 @@
   (:require [clojure.set :as set]
             [clojure.spec :as s]
             [clojure.string :as string]
-            [clojure.walk :as walk])
+            [clojure.walk :as walk]
+            [sails-forth.clojurify :as clj])
   (:import [java.util UUID]
            [net.sf.jsqlparser.parser CCJSqlParserUtil]
            [org.joda.time DateTime LocalDate])
@@ -87,13 +88,19 @@
   (let [{:keys [schema]} state
         type-schema (type-schema schema type)
         {:keys [fields]} type-schema
-        fields (into {} (map (juxt :name identity) fields))]
-    (when (or (seq (set/difference (set (keys attrs)) (set (keys fields))))
-              (not (every? (fn [[attr value]]
-                             (let [field (get fields attr)]
-                               (validate-attr state field value)))
-                           attrs)))
-      (throw (ex-info "invalid attrs" {:attrs attrs})))))
+        fields (into {} (map (juxt :name identity) fields))
+        diff (set/difference (set (keys attrs)) (set (keys fields)))
+        invalid-attrs (keep (fn [[attr value]]
+                              (let [field (get fields attr)
+                                    value (clj/parse-value field value)]
+                                (when-not (validate-attr state field value)
+                                  [attr field value])))
+                            attrs)]
+    (when (or (seq diff) (not (empty? invalid-attrs)))
+      (throw (ex-info "invalid attrs"
+                      {:attrs attrs
+                       :extra-keys diff
+                       :values-with-invalid-type invalid-attrs})))))
 
 (defn create
   [state type attrs]

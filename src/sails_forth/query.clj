@@ -3,7 +3,7 @@
   (:require [clojure.spec :as s]
             [clojure.string :as string]
             [sails-forth.client :as sf]
-            [sails-forth.clojurify :as sc :refer :all]
+            [sails-forth.clojurify :as sc]
             [sails-forth.spec :as spec]))
 
 (defprotocol SoqlValue
@@ -81,7 +81,7 @@
   "Creates a soql query string for the given client, type, and seq of field
    paths"
   [client type field-paths where]
-  (let [description (get-type-description client type)
+  (let [description (sf/get-type-description client type)
         soql-fields (map soql-value field-paths)]
     (str "SELECT " (string/join "," soql-fields)
          " FROM " (:name description)
@@ -93,7 +93,7 @@
   (mapv (fn [[op & args :as clause]]
           (case op
             :or `[:or ~@(map (partial update-attr-path client) args)]
-            (update clause 1 (fn [path] (resolve-attr-path client (first path) (rest path))))))
+            (update clause 1 (fn [path] (sf/resolve-attr-path client (first path) (rest path))))))
         where))
 
 (s/fdef query-attr-paths
@@ -109,7 +109,7 @@
    {:account {:name ... :createdby {:lastname ...}}}. The base type will also
    have metadata with a :url resolvable by the current client."
   [client type attr-paths where]
-  (let [field-paths (mapv (partial resolve-attr-path client type) attr-paths)
+  (let [field-paths (mapv (partial sf/resolve-attr-path client type) attr-paths)
         where (update-attr-path client where)
         soql (soql-query client type field-paths where)
         records (sf/query! client soql)]
@@ -117,12 +117,12 @@
             (let [url (get-in record [:attributes :url])]
               (with-meta
                 (reduce (fn [record' [field-path attr-path]]
-                          (let [record-path (resolve-field-path field-path)
+                          (let [record-path (sf/resolve-field-path field-path)
                                 value (get-in record record-path)
                                 field (last field-path)]
                             (cond-> record'
                               value
-                              (assoc-in attr-path (parse-value field value)))))
+                              (assoc-in attr-path (sc/parse-value field value)))))
                         {}
                         (map vector field-paths attr-paths))
                 {:url url})))

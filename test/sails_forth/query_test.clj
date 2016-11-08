@@ -11,7 +11,7 @@
 (deftest ^:integration test-soql-query
   (let [client (sf/build-http-client (test/load-config))]
     (is (= "SELECT Id FROM Opportunity"
-           (soql-query client :opportunity [(resolve-attr-path client :opportunity [:id])] [])))))
+           (soql-query client :opportunity [(sf/resolve-attr-path client :opportunity [:id])] [])))))
 
 (deftest ^:integration test-query
   (let [client (sf/build-http-client (test/load-config))]
