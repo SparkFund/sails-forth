@@ -41,5 +41,10 @@
                :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
              (sf/query! client (str "select Amount__c,CreatedBy.Name from Payment__c"))))
       (is (= 1 (sf/count! client "select Amount__c from Payment__c"))))
+    (testing "dates"
+      (let [id (sf/create! client "Payment__c" {"Actual_Date__c" "2016-01-01"})]
+        (is (= (sq/query client {:find [:payment :actual-date]})
+               [{:payment {}} ; TODO is this right? who knows
+                {:payment {:actual-date (org.joda.time.LocalDate. "2016-01-01")}}]))))
     (testing "limits"
       (is (= {} (sf/limits! client))))))
