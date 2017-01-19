@@ -93,7 +93,7 @@
         invalid-attrs (keep (fn [[attr value]]
                               (let [field (get fields attr)
                                     value (clj/parse-value field value)]
-                                (when-not (validate-attr state field value)
+                                (when-not (and field (validate-attr state field value))
                                   [attr field value])))
                             attrs)]
     (when (or (seq diff) (not (empty? invalid-attrs)))

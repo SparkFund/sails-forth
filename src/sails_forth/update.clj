@@ -67,3 +67,8 @@
   (let [sf-type (get-sf-type-name client type)
         sf-value-maps (mapv (partial sf-attrs client type) records)]
     (sf/import! client sf-type sf-value-maps)))
+
+(defn delete!
+  [client type id]
+  (let [sf-type (get-sf-type-name client type)]
+    (sf/delete! client sf-type id)))
