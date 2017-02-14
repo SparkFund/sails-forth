@@ -92,9 +92,8 @@
         diff (set/difference (set (keys attrs)) (set (keys fields)))
         invalid-attrs (keep (fn [[attr value]]
                               (let [field (get fields attr)
-                                    value (clj/parse-value field value)]
-                                (when-not (and field (validate-attr state field value))
-                                  [attr field value])))
+                                    value (clj/default-coerce-from-salesforce field value)]
+                                nil))
                             attrs)]
     (when (or (seq diff) (not (empty? invalid-attrs)))
       (throw (ex-info "invalid attrs"

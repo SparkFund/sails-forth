@@ -122,7 +122,7 @@
                                 field (last field-path)]
                             (cond-> record'
                               value
-                              (assoc-in attr-path (sc/parse-value field value)))))
+                              (assoc-in attr-path (sc/default-coerce-from-salesforce field value)))))
                         {}
                         (map vector field-paths attr-paths))
                 {:url url})))
