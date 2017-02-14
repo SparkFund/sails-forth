@@ -24,7 +24,7 @@
          (do (when-not desc
                (throw (ex-info (str "no SalesForce attribute for " k)
                                {:description desc})))
-             [sf-k (sc/render-value desc v)]))
+             [sf-k (sc/default-coerce-to-salesforce desc v)]))
        (into {})))
 
 (s/fdef update!

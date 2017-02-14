@@ -128,6 +128,14 @@
           "percent" (/ value 100M)
           value)))))
 
+(defmulti default-coerce-from-salesforce
+  (fn [field value]
+    (:type field)))
+
+(defmethod default-coerce-from-salesforce :default
+  [field value]
+  (parse-value field value))
+
 (s/fdef render-value
   :args (s/cat :field ::spec/field-description
                :value ::value)
@@ -146,3 +154,11 @@
           "date" (tf/unparse date-formatter (tc/to-date-time value))
           "percent" (* value 100M)
           value)))))
+
+(defmulti default-coerce-to-salesforce
+  (fn [field value]
+    (:type field)))
+
+(defmethod default-coerce-to-salesforce :default
+  [field value]
+  (render-value field value))
