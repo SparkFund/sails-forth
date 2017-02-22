@@ -619,3 +619,35 @@
                    (when (< tries import-total-tries)
                      (Thread/sleep import-poll-timeout-ms)
                      (recur (inc tries)))))))))
+
+(defn list-actions!
+  "Lists actions that can be performed at the given path."
+  [client path]
+  (let [url (str "/actions/" path)
+        response (request! client :get :data url nil)
+        {:keys [status body]} response]
+    (when (= status 200)
+      (if (contains? body :actions)
+        (vec (for [action (:actions body)]
+               (str path "/" (:name action))))
+        (mapv #(str path "/" (name %)) (keys body))))))
+
+(defn describe-action!
+  "Describes the action at the given path."
+  [client action]
+  (let [url (str "/actions/" action)
+        response (request! client :get :data url nil)
+        {:keys [status body]} response]
+    (when (= status 200)
+      (when (contains? body :inputs)
+        body))))
+
+(defn take-action!
+  [client action inputs]
+  (let [url (str "/actions/" action)
+        response (request! client :post :data url {"inputs" inputs})
+        {:keys [status body]} response]
+    (if (and (= status 200)
+             (every? :isSuccess body))
+      (mapv (comp :output :outputValues) body)
+      (throw (ex-info "action failed" response)))))

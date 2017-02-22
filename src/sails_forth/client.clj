@@ -60,7 +60,16 @@
     "Returns a persistent cache")
   (import!
     [_ type records]
-    "Imports the given records into the given type"))
+    "Imports the given records into the given type")
+  (list-actions!
+    [_ path]
+    "Gets a list of actions that can be performed")
+  (describe-action!
+    [_ action]
+    "Describes an action")
+  (take-action!
+    [_ action inputs]
+    "Submits a request to perform the given action"))
 
 (s/def ::client
   (partial satisfies? Client))
@@ -164,7 +173,13 @@
       (import! [_ type records]
         (http/import! client type records))
       (cache [_]
-        cache))))
+        cache)
+      (list-actions! [_ subtype]
+        (http/list-actions! client subtype))
+      (describe-action! [_ action]
+        (http/describe-action! client action))
+      (take-action! [_ action inputs]
+        (http/take-action! client action inputs)))))
 
 (s/fdef build-memory-client
   :args (s/cat :schema ::memory/schema)
