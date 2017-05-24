@@ -1,4 +1,7 @@
-(def version "0.1.2-SNAPSHOT")
+(task-options!
+  pom {:project     'sparkfund/sails-forth
+       :version     "0.6.0-alpha2"
+       :description "A Salesforce library"})
 
 (set-env!
  :resource-paths #{"src"}
