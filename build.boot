@@ -10,7 +10,7 @@
  '[[adzerk/boot-jar2bin "1.1.0" :scope "build"]
    [adzerk/boot-test "1.2.0" :scope "test"]
    [big-solutions/boot-mvn "0.1.5"]
-   [sparkfund/spec-coverage "0.1.0-SNAPSHOT" :scope "test"]
+   [sparkfund/spec-coverage "0.1.0" :scope "test"]
    [org.clojure/test.check "0.9.0" :scope "test"]
    [cheshire "5.5.0"]
    [clj-http "2.0.0"]
