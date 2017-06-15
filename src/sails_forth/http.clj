@@ -94,7 +94,7 @@
 (s/def ::host
   string?)
 
-(s/def read-only?
+(s/def ::read-only?
   boolean?)
 
 (s/def ::config

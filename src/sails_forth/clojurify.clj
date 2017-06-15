@@ -74,8 +74,9 @@
         keyword)))
 
 (s/fdef set-map
-  :args (s/and (s/coll-of (s/tuple keyword? any?))
-               #(= (count %) (count (set (map first %)))))
+  :args (s/cat :entries
+               (s/and (s/coll-of (s/tuple keyword? any?))
+                      #(= (count %) (count (set (map first %))))))
   :ret (s/map-of keyword? any?))
 
 (defn set-map

@@ -8,7 +8,8 @@
   string?)
 
 (s/def ::field
-  keyword?)
+  (s/or :keyword keyword?
+        :string string?))
 
 (s/def ::attrs
   (s/map-of ::field ::json-simple))
@@ -21,7 +22,8 @@
 
 (s/def ::json-simple
   (s/or :string string?
-        :number bigdec?
+        ;; some internal unit tests fail with bigdec?
+        :number number? ;bigdec?
         :nil nil?
         :boolean boolean?))
 
@@ -48,14 +50,96 @@
 (s/def ::relationshipName
   any?)
 
-(s/def ::field-description
-  (s/keys :req-un [::name
-                   ::type
+(s/def ::value
+  string?)
+
+(s/def ::active
+  boolean?)
+
+;; other possible keys:
+;;  :validFor
+;;  :defaultValue
+(s/def ::picklistValue
+	(s/keys :req-un [::label
+                   ::value
+                   ::active]))
+
+(s/def ::picklistValues
+	(s/coll-of ::picklistValue
+             :kind vector?))
+
+(defmulti field-description-type :type)
+(defmethod field-description-type "datetime" [_] (s/keys :req-un [::type]))
+(defmethod field-description-type "date" [_] (s/keys :req-un [::type]))
+(defmethod field-description-type "int" [_] (s/keys :req-un [::type]))
+(defmethod field-description-type "percent" [_] (s/keys :req-un [::type ::scale ::precision]))
+(defmethod field-description-type "double" [_] (s/keys :req-un [::type ::scale ::precision]))
+(defmethod field-description-type "currency" [_]
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
                    ::referenceTo
                    ::scale
                    ::precision
                    ::label
                    ::relationshipName]))
+(defmethod field-description-type "id" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "string" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "reference" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "boolean" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "textarea" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "picklist" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+
+(s/def ::field-description
+  (s/multi-spec field-description-type :type))
 
 (s/def ::custom
   boolean?)

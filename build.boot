@@ -22,7 +22,7 @@
          '[adzerk.boot-test :as bt]
          '[boot-mvn.core :refer [mvn]]
          '[clojure.java.io :as io]
-				 #_'[spec-coverage.boot :as cover])
+				 '[spec-coverage.boot :as cover])
 
 (deftask deps
   [])
@@ -34,7 +34,6 @@
   []
   (test* bt/test))
 
-#_
 (deftask spec-coverage
   []
   (test* cover/spec-coverage))

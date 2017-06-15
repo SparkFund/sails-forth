@@ -100,7 +100,8 @@
   :args (s/cat :client ::sf/client
                :type ::sc/attr
                :attr-paths (s/coll-of ::sc/attr-path :min-count 1)
-               :where (s/coll-of ::where-clause)))
+               :where (s/nilable (s/coll-of ::where-clause)))
+  :ret (s/coll-of map? :kind vector?))
 
 (defn query-attr-paths
   "Queries the given client and type for the given seq of attr-paths, e.g.
@@ -177,7 +178,7 @@
       (let [type (ffirst attr-paths)]
         (mapv (fn [record]
                 {type record})
-              (query-attr-paths client type (map next attr-paths) (:where query)))))))
+              (query-attr-paths client type (map #(subvec % 1) attr-paths) (:where query)))))))
 
 (s/fdef record-types
   :args (s/cat :client ::sf/client)

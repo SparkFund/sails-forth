@@ -10,3 +10,6 @@ pom.xml.asc
 .hgignore
 .hg/
 test/config.edn
+*.swp
+*.tmp
+.nrepl-history
