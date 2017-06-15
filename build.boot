@@ -27,24 +27,35 @@
 (deftask deps
   [])
 
+(def only-integration '(-> % meta :integration))
 (def no-integration '(-> % meta :integration not))
 
-(deftask integration
+(deftask test-all
+  "Run every unit test, including integration tests"
   []
   (bt/test))
 
+(deftask test-integration
+  "Only run integration tests"
+  []
+  (bt/test
+    :filters [only-integration]))
+
 (deftask test
+  "Run every non-integration test."
   []
   (bt/test 
     :filters [no-integration]))
 
 (deftask spec-coverage
+  "Spec coverage checking using non-integration tests."
   []
   (cover/spec-coverage 
     :filters [no-integration]
     :instrument 'spec-coverage.instrument/in-n-outstrument))
 
-(deftask spec-coverage-integration
+(deftask spec-coverage-all
+  "Spec coverage checking, including integration tests."
   []
   (cover/spec-coverage
     :instrument 'spec-coverage.instrument/in-n-outstrument))
