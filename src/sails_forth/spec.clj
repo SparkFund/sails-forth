@@ -60,12 +60,12 @@
 ;;  :validFor
 ;;  :defaultValue
 (s/def ::picklistValue
-	(s/keys :req-un [::label
+  (s/keys :req-un [::label
                    ::value
                    ::active]))
 
 (s/def ::picklistValues
-	(s/coll-of ::picklistValue
+  (s/coll-of ::picklistValue
              :kind vector?))
 
 (defmulti field-description-type :type)
