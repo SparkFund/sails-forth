@@ -36,10 +36,7 @@
                                  :precision 4}
                                 6.18M))))
   (testing "int"
-    (is (= 500 (parse-value {:type "int"} 500M))))
-  #_
-  (testing "other"
-    (is (= "foo" (parse-value {} "foo")))))
+    (is (= 500 (parse-value {:type "int"} 500M)))))
 
 (deftest test-render-value
   (testing "datetime"
@@ -58,10 +55,7 @@
                           :scale 2
                           :precision 4}
                          0.0618M)
-           6.18M)))
-  #_
-  (testing "other"
-    (is (= "foo" (parse-value {} "foo")))))
+           6.18M))))
 
 (deftest ^:integration test-get-field-description
   (let [client (sf/build-http-client (test/load-config))]

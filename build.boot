@@ -10,13 +10,13 @@
  '[[adzerk/boot-jar2bin "1.1.0" :scope "build"]
    [adzerk/boot-test "1.2.0" :scope "test"]
    [big-solutions/boot-mvn "0.1.5"]
-   [sparkfund/spec-coverage "0.1.0" :scope "test"]
-   [org.clojure/test.check "0.9.0" :scope "test"]
    [cheshire "5.5.0"]
    [clj-http "2.0.0"]
    [clj-time "0.11.0"]
    [com.github.jsqlparser/jsqlparser "0.9.5"]
-   [org.clojure/clojure "1.9.0-alpha10"]])
+   [org.clojure/clojure "1.9.0-alpha10"]
+   [org.clojure/test.check "0.9.0" :scope "test"]
+   [sparkfund/spec-coverage "0.2.0" :scope "test"]])
 
 (require '[adzerk.boot-jar2bin :refer :all]
          '[adzerk.boot-test :as bt]
@@ -27,13 +27,24 @@
 (deftask deps
   [])
 
-(defn test* [test-fn]
-  (test-fn :filters '[(-> % meta :integration not)]))
+(def no-integration '(-> % meta :integration not))
+
+(deftask integration
+  []
+  (bt/test))
 
 (deftask test
   []
-  (test* bt/test))
+  (bt/test 
+    :filters [no-integration]))
 
 (deftask spec-coverage
   []
-  (test* cover/spec-coverage))
+  (cover/spec-coverage 
+    :filters [no-integration]
+    :instrument 'spec-coverage.instrument/in-n-outstrument))
+
+(deftask spec-coverage-integration
+  []
+  (cover/spec-coverage
+    :instrument 'spec-coverage.instrument/in-n-outstrument))
