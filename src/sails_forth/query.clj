@@ -41,12 +41,15 @@
 (s/def ::where-value
   (s/or :string string?
         :set (s/coll-of string? :kind set?)
-        :fields ::sc/field-path))
+        :fields (s/coll-of (s/or :simple-field ::spec/field
+                                 :field-description ::spec/field-description)
+                           :kind vector?)))
 
+;; use tuple over cat so `exercise` will generate vectors.
 (s/def ::where-clause
-  (s/cat :operator ::where-operator
-         :lhs ::where-value
-         ::rhs ::where-value))
+  (s/tuple #_:operator ::where-operator
+           #_:lhs ::where-value
+           #_:rhs ::where-value))
 
 (declare soql-where*)
 
@@ -63,7 +66,7 @@
       (str (soql-value lh) " " (name op) " " (soql-value rh)))))
 
 (s/fdef soql-where*
-  :args (s/coll-of ::where-clause)
+  :args (s/cat :clauses (s/coll-of ::where-clause))
   :ret string?)
 
 (defn soql-where*
@@ -93,7 +96,7 @@
   (mapv (fn [[op & args :as clause]]
           (case op
             :or `[:or ~@(map (partial update-attr-path client) args)]
-            (update clause 1 (fn [path] (sf/resolve-attr-path client (first path) (rest path))))))
+            (update clause 1 (fn [path] (sf/resolve-attr-path client (nth path 0) (subvec path 1))))))
         where))
 
 (s/fdef query-attr-paths

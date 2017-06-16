@@ -47,6 +47,9 @@
 (s/def ::label
   string?)
 
+(s/def ::name
+  string?)
+
 (s/def ::relationshipName
   any?)
 
@@ -60,7 +63,10 @@
 ;;  :validFor
 ;;  :defaultValue
 (s/def ::picklistValue
-  (s/keys :req-un [::label
+  (s/keys :req-un [
+                   ; label can be nil in a picklistValue, is that correct? Awkward to express.
+                   ; ::label 
+
                    ::value
                    ::active]))
 
@@ -129,6 +135,42 @@
                    ::label
                    ::relationshipName]))
 (defmethod field-description-type "picklist" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "url" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "multipicklist" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "address" [_] 
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "phone" [_] 
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name

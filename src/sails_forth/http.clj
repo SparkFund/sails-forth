@@ -13,7 +13,7 @@
 (s/def ::url
   string?)
 
-(s/def ::param
+(s/def ::params
   (s/map-of keyword? any?))
 
 (s/def ::status
@@ -66,9 +66,12 @@
 (s/def ::access_token
   string?)
 
-(s/def ::authentication
+(s/def ::non-nil-authentication
   (s/keys :req-un [::instance_url
                    ::access_token]))
+
+(s/def ::authentication
+  (s/nilable ::non-nil-authentication))
 
 (s/def ::username
   string?)
@@ -126,7 +129,7 @@
 
 (s/fdef authenticate
   :args (s/cat :config ::config)
-  :ret (s/nilable ::authentication))
+  :ret ::authentication)
 
 (defn authenticate
   [config]
@@ -148,7 +151,7 @@
         response (http/request request)
         {:keys [status body]} response]
     (when (and (= 200 status)
-               (s/valid? ::authentication body))
+               (s/valid? ::non-nil-authentication body))
       body)))
 
 (s/def ::version-map
@@ -160,7 +163,7 @@
 
 (s/fdef versions
   :args (s/cat :url ::url)
-  :ret (s/nilable ::version))
+  :ret (s/nilable ::versions))
 
 (defn versions
   [url]
