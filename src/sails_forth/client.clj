@@ -219,7 +219,7 @@
 
 (s/fdef get-types
   :args (s/cat :client ::client)
-  :ret (s/map-of ::attr ::spec/object-overview))
+  :ret (s/map-of ::clj/attr ::spec/object-overview))
 
 (defn get-types
   "Obtains a map of descriptions by type"
@@ -236,7 +236,7 @@
 
 (s/fdef get-type-description
   :args (s/cat :client ::client
-               :type ::attr)
+               :type ::clj/attr)
   :ret (s/nilable ::spec/object-description))
 
 (defn get-type-description
@@ -271,8 +271,8 @@
 
 (s/fdef get-fields
   :args (s/cat :client ::client
-               :type ::attr)
-  :ret (s/nilable (s/map-of ::attr ::spec/field-description)))
+               :type ::clj/attr)
+  :ret (s/nilable (s/map-of ::clj/attr ::spec/field-description)))
 
 (defn get-fields
   "Obtains a map of descriptions by field for the given type"
@@ -281,8 +281,8 @@
 
 (s/fdef get-field-description
   :args (s/cat :client ::client
-               :type ::attr
-               :attr ::attr)
+               :type ::clj/attr
+               :attr ::clj/attr)
   :ret (s/nilable ::spec/field-description))
 
 (defn get-field-description
@@ -293,9 +293,9 @@
 
 (s/fdef get-attrs-for-label
   :args (s/cat :client ::client
-               :type ::attr
+               :type ::clj/attr
                :label string?)
-  :ret (s/coll-of ::attr :kind set?))
+  :ret (s/coll-of ::clj/attr :kind set?))
 
 (defn get-attrs-for-label
   "Returns the set of attributes on the given type that have the given label"
@@ -305,8 +305,8 @@
 
 (s/fdef resolve-attr-path
   :args (s/cat :client ::client
-               :type ::attr
-               :attr-path ::attr-path)
+               :type ::clj/attr
+               :attr-path ::clj/attr-path)
   :ret ::clj/field-path)
 
 (defn resolve-attr-path
@@ -330,7 +330,7 @@
                (conj fields field))))))
 
 (s/fdef resolve-field-path
-  :args (s/cat :field-path ::field-path)
+  :args (s/cat :field-path ::clj/field-path)
   :ret ::clj/attr-path)
 
 (defn resolve-field-path
@@ -355,7 +355,7 @@
 
 (s/fdef schema
   :args (s/cat :client ::client
-               :types (s/coll-of ::attr))
+               :types (s/coll-of ::clj/attr))
   :ret ::memory/schema)
 
 (defn schema

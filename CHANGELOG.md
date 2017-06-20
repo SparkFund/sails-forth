@@ -1,3 +1,9 @@
+## 0.6.0
+
+* Fix incorrect specs
+* Add spec-coverage
+* Add actions-related methods
+
 ## 0.5.0
 
 * Replace core.typed with clojure.spec

@@ -1,6 +1,7 @@
 (ns sails-forth.clojurify-test
   (:require [clj-time.core :as time]
             [clojure.test :refer :all]
+            [clojure.spec.test :as stest]
             [sails-forth.client :as sf]
             [sails-forth.clojurify :refer :all]
             [sails-forth.test :as test]))
@@ -35,9 +36,7 @@
                                  :precision 4}
                                 6.18M))))
   (testing "int"
-    (is (= 500 (parse-value {:type "int"} 500M))))
-  (testing "other"
-    (is (= "foo" (parse-value {} "foo")))))
+    (is (= 500 (parse-value {:type "int"} 500M)))))
 
 (deftest test-render-value
   (testing "datetime"
@@ -56,9 +55,7 @@
                           :scale 2
                           :precision 4}
                          0.0618M)
-           6.18M)))
-  (testing "other"
-    (is (= "foo" (parse-value {} "foo")))))
+           6.18M))))
 
 (deftest ^:integration test-get-field-description
   (let [client (sf/build-http-client (test/load-config))]
