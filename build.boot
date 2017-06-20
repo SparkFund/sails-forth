@@ -1,6 +1,8 @@
+(def version "0.6.0")
+
 (task-options!
-  pom {:project     'sparkfund/sails-forth
-       :version     "0.6.0"
+  pom {:project 'sparkfund/sails-forth
+       :version version
        :description "A Salesforce library"})
 
 (set-env!
@@ -62,3 +64,11 @@
   []
   (cover/spec-coverage
     :instrument 'spec-coverage.instrument/in-n-outstrument))
+
+(require '[adzerk.bootlaces :refer :all])
+
+(bootlaces! version)
+
+(deftask release
+  []
+  (comp (build-jar) (push-release)))
