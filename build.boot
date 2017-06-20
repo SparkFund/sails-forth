@@ -16,7 +16,10 @@
    [com.github.jsqlparser/jsqlparser "0.9.5"]
    [org.clojure/clojure "1.9.0-alpha10"]
    [org.clojure/test.check "0.9.0" :scope "test"]
-   [sparkfund/spec-coverage "0.2.0" :scope "test"]])
+   [sparkfund/spec-coverage "0.2.0" :scope "test"]]
+ :repositories
+ #(conj % ["sparkfund" {:url "s3p://sparkfund-maven/releases/"}])
+ :wagons '[[sparkfund/aws-cli-wagon "1.0.4"]])
 
 (require '[adzerk.boot-jar2bin :refer :all]
          '[adzerk.boot-test :as bt]
@@ -44,13 +47,13 @@
 (deftask test
   "Run every non-integration test."
   []
-  (bt/test 
+  (bt/test
     :filters [no-integration]))
 
 (deftask spec-coverage
   "Spec coverage checking using non-integration tests."
   []
-  (cover/spec-coverage 
+  (cover/spec-coverage
     :filters [no-integration]
     :instrument 'spec-coverage.instrument/in-n-outstrument))
 
