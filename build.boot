@@ -1,6 +1,6 @@
 (task-options!
   pom {:project     'sparkfund/sails-forth
-       :version     "0.6.0-alpha2"
+       :version     "0.6.0"
        :description "A Salesforce library"})
 
 (set-env!
