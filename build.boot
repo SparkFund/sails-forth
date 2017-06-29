@@ -58,13 +58,13 @@
   []
   (cover/spec-coverage
     :filters [no-integration]
-    :instrument 'spec-coverage.instrument/in-n-outstrument))
+    :instrument 'sparkfund.boot-spec-coverage.instrument/in-n-outstrument))
 
 (deftask spec-coverage-all
   "Spec coverage checking, including integration tests."
   []
   (cover/spec-coverage
-    :instrument 'spec-coverage.instrument/in-n-outstrument))
+    :instrument 'sparkfund.boot-spec-coverage.instrument/in-n-outstrument))
 
 (require '[adzerk.bootlaces :refer :all])
 

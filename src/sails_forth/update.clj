@@ -34,7 +34,7 @@
                :values (s/map-of ::sc/attr ::sc/value))
   :ret #{true})
 
-(defn update!
+(defn ^:spark/no-boot-spec-coverage update!
   "Performs updates on the object `object-id` with the given `type`."
   [client type object-id new-value-map]
   (let [sf-type (get-sf-type-name client type)
@@ -47,7 +47,7 @@
                :values (s/map-of ::sc/attr ::sc/value))
   :ret ::spec/id)
 
-(defn create!
+(defn ^:spark/no-boot-spec-coverage create!
   [client type new-value-map]
   (let [sf-type (get-sf-type-name client type)
         sf-value-map (sf-attrs client type new-value-map)]
@@ -62,7 +62,7 @@
   :fn (fn [{:keys [args ret]}]
         (= (count (:records args)) (count @ret))))
 
-(defn import!
+(defn ^:spark/no-boot-spec-coverage import!
   [client type records]
   (let [sf-type (get-sf-type-name client type)
         sf-value-maps (mapv (partial sf-attrs client type) records)]

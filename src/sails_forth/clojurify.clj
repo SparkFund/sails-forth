@@ -42,7 +42,7 @@
   :args (s/cat :field ::spec/field-description)
   :ret ::attr)
 
-(defn field->refers-attr
+(defn ^:spark/no-boot-spec-coverage field->refers-attr
   "Derives a clojurey attribute keyword representation of the Salesforce
    relation about which this field refers"
   [field]

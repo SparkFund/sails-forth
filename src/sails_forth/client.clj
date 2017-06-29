@@ -6,8 +6,10 @@
             [sails-forth.clojurify :as clj]))
 
 (defprotocol Cache
-  (put! [_ key value])
-  (get! [_ key]))
+  (^:spark/no-boot-spec-coverage
+    put! [_ key value])
+  (^:spark/no-boot-spec-coverage
+    get! [_ key]))
 
 (s/def ::cache
   (partial satisfies? Cache))
@@ -23,7 +25,8 @@
   :ret any?)
 
 (defprotocol Client
-  (create!
+  (^:spark/no-boot-spec-coverage
+    create!
     [_ type attrs]
     "Creates an object of the given type and attrs using the given salesforce
      client. If salesforce responds successfully, this returns the object's id,
@@ -36,29 +39,36 @@
     [_ type id attrs]
     "Updates the object of the given type with the given id. This returns true
      if it succeeds and raises an exception otherwise.")
-  (list!
+  (^:spark/no-boot-spec-coverage
+    list!
     [_ type]
     "Lists all objets of the given type")
-  (describe!
+  (^:spark/no-boot-spec-coverage
+    describe!
     [_ type]
     "Describes the given type")
-  (objects!
+  (^:spark/no-boot-spec-coverage
+    objects!
    [_]
    "Lists all objects")
-  (query!
+  (^:spark/no-boot-spec-coverage
+    query!
     [_ query]
     "Executes the given query and returns all results, eagerly fetching if there
      is pagination")
-  (count!
+  (^:spark/no-boot-spec-coverage 
+    count!
     [_ query]
     "Returns the number of results from the given query")
-  (limits!
+  (^:spark/no-boot-spec-coverage
+    limits!
     [_]
     "Returns the current limits")
   (cache
     [_]
     "Returns a persistent cache")
-  (import!
+  (^:spark/no-boot-spec-coverage
+    import!
     [_ type records]
     "Imports the given records into the given type")
   (list-actions!
@@ -147,7 +157,7 @@
   :args (s/cat :config ::http/config)
   :ret ::client)
 
-(defn build-http-client
+(defn ^:spark/no-boot-spec-coverage build-http-client
   [config]
   (let [client (http/build-client! config)
         cache (build-atomic-cache)]
@@ -274,7 +284,7 @@
                :type ::clj/attr)
   :ret (s/nilable (s/map-of ::clj/attr ::spec/field-description)))
 
-(defn get-fields
+(defn ^:spark/no-boot-spec-coverage get-fields
   "Obtains a map of descriptions by field for the given type"
   [client type]
   (::attr->field (get-type-description client type)))
@@ -297,7 +307,7 @@
                :label string?)
   :ret (s/coll-of ::clj/attr :kind set?))
 
-(defn get-attrs-for-label
+(defn ^:spark/no-boot-spec-coverage get-attrs-for-label
   "Returns the set of attributes on the given type that have the given label"
   [client type label]
   (let [description (get-type-description client type)]
@@ -358,7 +368,7 @@
                :types (s/coll-of ::clj/attr))
   :ret ::memory/schema)
 
-(defn schema
+(defn ^:spark/no-boot-spec-coverage schema
   [client types]
   (let [type-attrs #{:name :label :custom :fields}
         field-attrs #{:name

@@ -39,7 +39,7 @@
                :params (s/nilable ::params))
   :ret ::response)
 
-(defn json-request
+(defn ^:spark/no-boot-spec-coverage json-request
   [method headers url params]
   (let [request (cond-> {:method method
                          :url url
@@ -131,7 +131,7 @@
   :args (s/cat :config ::config)
   :ret ::authentication)
 
-(defn authenticate
+(defn ^:spark/no-boot-spec-coverage authenticate
   [config]
   (let [{:keys [host username password token consumer-key consumer-secret]} config
         params {:username username
@@ -165,7 +165,7 @@
   :args (s/cat :url ::url)
   :ret (s/nilable ::versions))
 
-(defn versions
+(defn ^:spark/no-boot-spec-coverage versions
   [url]
   (let [url (str url "/services/data/")
         response (json-request :get {} url nil)
@@ -182,7 +182,7 @@
   :ret (s/or :implied ::api-hosts
              :given ::host))
 
-(defn derive-host
+(defn ^:spark/no-boot-spec-coverage derive-host
   [config]
   (let [{:keys [sandbox? host]} config]
     (or host (if sandbox? "test.salesforce.com" "login.salesforce.com"))))
@@ -191,7 +191,7 @@
   :args (s/cat :config ::config)
   :ret ::state)
 
-(defn build-state
+(defn ^:spark/no-boot-spec-coverage build-state
   [config]
   (let [{:keys [version]} config
         host (derive-host config)
@@ -208,7 +208,7 @@
   :args (s/cat :state ::state)
   :ret ::state)
 
-(defn try-authentication
+(defn ^:spark/no-boot-spec-coverage try-authentication
   [state]
   (let [{:keys [authentication config requests]} state]
     (cond-> state
@@ -220,7 +220,7 @@
   :args (s/cat :state ::state)
   :ret ::state)
 
-(defn try-to-find-latest-version
+(defn ^:spark/no-boot-spec-coverage try-to-find-latest-version
   [state]
   (let [{:keys [authentication requests version version-url]} state
         last-version (when (and (not (and version version-url))
@@ -243,7 +243,7 @@
                :params ::params)
   :ret (s/tuple ::state (s/nilable ::response)))
 
-(defn request
+(defn ^:spark/no-boot-spec-coverage request
   [state method service url params]
   (when (and (:read-only? state)
              (case method
@@ -295,7 +295,7 @@
                :params ::params)
   :ret (s/nilable ::response))
 
-(defn request!
+(defn ^:spark/no-boot-spec-coverage request!
   "Issue the given request using the given client"
   [client method service url params]
   (let [[client' response] (request @client method service url params)]
@@ -307,7 +307,7 @@
   :args (s/cat :config ::config)
   :ret ::client)
 
-(defn build-client!
+(defn ^:spark/no-boot-spec-coverage build-client!
   "Creates a stateful Salesforce client from the given config. The client
    authenticates lazily and uses the latest Salesforce version if none is
    specified. If an authenticated request receives an invalid authentication
@@ -328,7 +328,7 @@
                :attrs ::spec/attrs)
   :ret ::spec/id)
 
-(defn create!
+(defn ^:spark/no-boot-spec-coverage create!
   "Creates an object of the given type and attrs using the given salesforce
    client. If salesforce responds successfully, this returns the object's id,
    otherwise this raises an exception."
@@ -355,7 +355,7 @@
                :id ::spec/id)
   :ret boolean?)
 
-(defn delete!
+(defn ^:spark/no-boot-spec-coverage delete!
   "Deletes the object of the given type with the given id. This returns true
    if it succeeds and raises an exception otherwise."
   [client type id]
@@ -380,7 +380,7 @@
                :attrs ::spec/attrs)
   :ret boolean?)
 
-(defn update!
+(defn ^:spark/no-boot-spec-coverage update!
   "Updates the object of the given type with the given id. This returns true
    if it succeeds and raises an exception otherwise."
   [client type id attrs]
@@ -403,7 +403,7 @@
                :type ::spec/type)
   :ret (s/nilable ::spec/json-map))
 
-(defn list!
+(defn ^:spark/no-boot-spec-coverage list!
   [client type]
   (let [url (str "/sobjects/" type)
         response (request! client :get :data url {})
@@ -425,7 +425,7 @@
                :type ::spec/type)
   :ret (s/nilable ::spec/object-description))
 
-(defn describe!
+(defn ^:spark/no-boot-spec-coverage describe!
   [client type]
   (let [url (str "/sobjects/" type "/describe")
         response (request! client :get :data url {})
@@ -446,7 +446,7 @@
   :args (s/cat :client ::client)
   :ret ::spec/objects-overview)
 
-(defn objects!
+(defn ^:spark/no-boot-spec-coverage objects!
   [client]
   (let [url "/sobjects"
         response (request! client :get :data url {})
@@ -465,7 +465,7 @@
                :query ::spec/query)
   :ret ::spec/records)
 
-(defn query!
+(defn ^:spark/no-boot-spec-coverage query!
   "Executes the given query and returns all results, eagerly fetching if there
    is pagination"
   [client query]
@@ -493,7 +493,7 @@
                :query ::spec/query)
   :ret nat-int?)
 
-(defn count!
+(defn ^:spark/no-boot-spec-coverage count!
   "Executes the given query and returns the total number of results.
    This is intended for use with COUNT() queries."
   [client query]
@@ -514,7 +514,7 @@
   :args (s/cat :client ::client)
   :ret ::spec/limits)
 
-(defn limits!
+(defn ^:spark/no-boot-spec-coverage limits!
   [client]
   (let [response (request! client :get :data "/limits" {})
         {:keys [status body]} response]
@@ -542,7 +542,7 @@
                :operation ::job-operation)
   :ret (s/nilable ::spec/id))
 
-(defn create-import-job!
+(defn ^:spark/no-boot-spec-coverage create-import-job!
   [client type operation]
   (let [params {:operation (name operation)
                 :object type
@@ -559,7 +559,7 @@
                :id ::spec/id)
   :ret (s/nilable true?))
 
-(defn close-import-job!
+(defn ^:spark/no-boot-spec-coverage close-import-job!
   [client id]
   (let [params {:state "Closed"}
         response (request! client :post :async (str "/job/" id) params)
@@ -578,7 +578,7 @@
                :records (s/coll-of ::spec/attrs))
   :ret ::spec/id)
 
-(defn add-import-batch!
+(defn ^:spark/no-boot-spec-coverage add-import-batch!
   [client id records]
   (let [url (str "/job/" id "/batch")
         response (request! client :post :async url records)
