@@ -17,9 +17,9 @@
    [clj-http "2.0.0"]
    [clj-time "0.11.0"]
    [com.github.jsqlparser/jsqlparser "0.9.5"]
-   [org.clojure/clojure "1.9.0-alpha10" :scope "provided"]
+   [org.clojure/clojure "1.9.0-alpha17" :scope "provided"]
    [org.clojure/test.check "0.9.0" :scope "test"]
-   [sparkfund/spec-coverage "0.2.0" :scope "test"]]
+   [sparkfund/boot-spec-coverage "0.4.0" :scope "test"]]
  :repositories
  #(conj % ["sparkfund" {:url "s3p://sparkfund-maven/releases/"}])
  :wagons '[[sparkfund/aws-cli-wagon "1.0.4"]])
@@ -28,7 +28,7 @@
          '[adzerk.boot-test :as bt]
          '[boot-mvn.core :refer [mvn]]
          '[clojure.java.io :as io]
-         '[spec-coverage.boot :as cover])
+         '[sparkfund.boot-spec-coverage :as cover])
 
 (deftask deps
   [])

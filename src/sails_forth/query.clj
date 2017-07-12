@@ -1,6 +1,6 @@
 (ns sails-forth.query
   "Provides for executing queries using more idiomatic clojure forms"
-  (:require [clojure.spec :as s]
+  (:require [clojure.spec.alpha :as s]
             [clojure.string :as string]
             [sails-forth.client :as sf]
             [sails-forth.clojurify :as sc]

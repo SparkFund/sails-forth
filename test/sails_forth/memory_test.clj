@@ -1,7 +1,7 @@
 (ns sails-forth.memory-test
   (:require [clojure.edn :as edn]
             [clojure.test :refer :all]
-            [clojure.spec.test :as stest]
+            [clojure.spec.test.alpha :as stest]
             [sails-forth.client :as sf]
             [sails-forth.memory :refer :all]
             [sails-forth.query :as sq])

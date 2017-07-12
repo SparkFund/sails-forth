@@ -1,5 +1,5 @@
 (ns sails-forth.client
-  (:require [clojure.spec :as s]
+  (:require [clojure.spec.alpha :as s]
             [sails-forth.http :as http]
             [sails-forth.memory :as memory]
             [sails-forth.spec :as spec]

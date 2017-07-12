@@ -1,7 +1,7 @@
 (ns sails-forth.http
   (:require [cheshire.parse]
             [clj-http.client :as http]
-            [clojure.spec :as s]
+            [clojure.spec.alpha :as s]
             [sails-forth.spec :as spec]))
 
 (def http-methods

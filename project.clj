@@ -7,7 +7,7 @@
                  [clj-http "2.0.0"]
                  [clj-time "0.11.0"]
                  [com.github.jsqlparser/jsqlparser "0.9.5"]
-                 [org.clojure/clojure "1.9.0-alpha10"]]
+                 [org.clojure/clojure "1.9.0-alpha17"]]
   :profiles {:dev {:dependencies [[org.clojure/test.check "0.9.0"]]}}
   :repl-options {:init-ns sails-forth.repl}
   :test-selectors {:integration :integration

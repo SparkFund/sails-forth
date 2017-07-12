@@ -1,6 +1,6 @@
 (ns sails-forth.update
   "Execute SalesForce updates using more idiomatic Clojure syntax."
-  (:require [clojure.spec :as s]
+  (:require [clojure.spec.alpha :as s]
             [sails-forth.client :as sf]
             [sails-forth.clojurify :as sc]
             [sails-forth.spec :as spec]))
