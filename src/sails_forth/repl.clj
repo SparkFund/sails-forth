@@ -1,6 +1,6 @@
 (ns sails-forth.repl
   (:require [clojure.edn :as edn]
-            [clojure.spec :as s]
+            [clojure.spec.alpha :as s]
             [sails-forth.client :as sf]
             [sails-forth.clojurify :as sc]
             [sails-forth.query :as sq]

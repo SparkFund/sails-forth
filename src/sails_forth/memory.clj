@@ -1,6 +1,6 @@
 (ns sails-forth.memory
   (:require [clojure.set :as set]
-            [clojure.spec :as s]
+            [clojure.spec.alpha :as s]
             [clojure.string :as string]
             [clojure.walk :as walk]
             [sails-forth.clojurify :as clj])

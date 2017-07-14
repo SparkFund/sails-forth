@@ -3,7 +3,7 @@
   more Clojure-y keywords."
   (:require [clj-time.coerce :as tc]
             [clj-time.format :as tf]
-            [clojure.spec :as s]
+            [clojure.spec.alpha :as s]
             [clojure.string :as string]
             [sails-forth.spec :as spec])
   (:import [org.joda.time DateTime LocalDate]))

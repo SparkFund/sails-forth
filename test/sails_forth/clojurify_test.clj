@@ -1,7 +1,7 @@
 (ns sails-forth.clojurify-test
   (:require [clj-time.core :as time]
             [clojure.test :refer :all]
-            [clojure.spec.test :as stest]
+            [clojure.spec.test.alpha :as stest]
             [sails-forth.client :as sf]
             [sails-forth.clojurify :refer :all]
             [sails-forth.test :as test]))
