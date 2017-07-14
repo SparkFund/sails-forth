@@ -1,3 +1,7 @@
+## 0.7.0
+
+* Update to clojure-1.9.0alpha17 and clojure.spec.alpha
+
 ## 0.6.0
 
 * Fix incorrect specs

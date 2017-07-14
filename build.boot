@@ -1,4 +1,4 @@
-(def version "0.6.0")
+(def version "0.7.0")
 
 (task-options!
   pom {:project 'sparkfund/sails-forth
