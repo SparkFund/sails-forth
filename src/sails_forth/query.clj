@@ -57,7 +57,7 @@
   :args (s/cat :clause ::where-clause)
   :ret string?)
 
-(defn soql-where
+(defn ^:spark/no-boot-spec-coverage soql-where
   [[op & args]]
   ;; TODO the type of op is significant
   (case op
@@ -69,7 +69,7 @@
   :args (s/cat :clauses (s/coll-of ::where-clause))
   :ret string?)
 
-(defn soql-where*
+(defn ^:spark/no-boot-spec-coverage soql-where*
   [where*]
   (string/join " AND " (map soql-where where*)))
 
@@ -187,7 +187,7 @@
   :args (s/cat :client ::sf/client)
   :ret (s/map-of ::spec/id string?))
 
-(defn record-types
+(defn ^:spark/no-boot-spec-coverage record-types
   [client]
   (let [cache (sf/cache client)]
     (or (sf/get! cache ::record-types)
@@ -203,6 +203,6 @@
                :name ::spec/type)
   :ret ::spec/id)
 
-(defn record-type-id
+(defn ^:spark/no-boot-spec-coverage record-type-id
   [client record-type-name]
   (get (record-types client) record-type-name))
