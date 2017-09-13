@@ -4,6 +4,9 @@
             [clojure.spec.alpha :as s]
             [sails-forth.spec :as spec]))
 
+(when-not http/json-enabled?
+  (throw (ex-info "clj-http cannot parse json" {})))
+
 (def http-methods
   #{:get :post :patch :put :delete})
 
@@ -127,6 +130,19 @@
                    ::version-url
                    ::version]))
 
+(defn valid-response
+  [spec response]
+  (let [{:keys [status body]} response]
+    (and (= 200 status)
+         (or (nil? spec)
+             (s/valid? spec body)))))
+
+(defn validate-response!
+  [spec response]
+  (when-not (valid-response spec response)
+    (throw (ex-info "Invalid response" {:response response
+                                        :spec spec}))))
+
 (s/fdef authenticate
   :args (s/cat :config ::config)
   :ret ::authentication)
@@ -150,9 +166,8 @@
                  :as :json}
         response (http/request request)
         {:keys [status body]} response]
-    (when (and (= 200 status)
-               (s/valid? ::non-nil-authentication body))
-      body)))
+    (validate-response! ::non-nil-authentication response)
+    body))
 
 (s/def ::version-map
   (s/keys :req-un [::url
@@ -170,9 +185,8 @@
   (let [url (str url "/services/data/")
         response (json-request :get {} url nil)
         {:keys [status body]} response]
-    (when (and (= 200 status)
-               (s/valid? ::versions body))
-      body)))
+    (validate-response! ::versions response)
+    body))
 
 (s/def ::api-hosts
   #{"test.salesforce.com" "login.salesforce.com"})
@@ -408,8 +422,7 @@
   (let [url (str "/sobjects/" type)
         response (request! client :get :data url {})
         {:keys [status body]} response]
-    (cond (and (= 200 status)
-               (s/valid? ::spec/json-map body))
+    (cond (valid-response ::spec/json-map body)
           body
           (= 404 status)
           nil
@@ -430,8 +443,7 @@
   (let [url (str "/sobjects/" type "/describe")
         response (request! client :get :data url {})
         {:keys [status body]} response]
-    (cond (and (= 200 status)
-               (s/valid? ::spec/object-description body))
+    (cond (valid-response ::spec/object-description response)
           body
           (= 404 status)
           nil
@@ -451,8 +463,7 @@
   (let [url "/sobjects"
         response (request! client :get :data url {})
         {:keys [status body]} response]
-    (cond (and (= 200 status)
-               (s/valid? ::spec/objects-overview body))
+    (cond (valid-response ::spec/objects-overview response)
           body
           :else
           (let [data {:status status
@@ -475,8 +486,7 @@
     (loop [response response
            results []]
       (let [{:keys [status body]} response]
-        (if (and (= 200 status)
-                 (s/valid? ::spec/query-results body))
+        (if (valid-response ::spec/query-results response)
           (let [results (into results (get body :records))]
             (if (get body :done)
               results
@@ -501,8 +511,7 @@
         params {:q query}
         response (request! client :get :data url params)]
     (let [{:keys [status body]} response]
-      (if (and (= 200 status)
-               (s/valid? ::spec/count-query-results body))
+      (if (valid-response ::spec/count-query-results response)
         (get body :totalSize)
         (let [data {:query query
                     :status status
@@ -518,8 +527,7 @@
   [client]
   (let [response (request! client :get :data "/limits" {})
         {:keys [status body]} response]
-    (if (and (= 200 status)
-             (s/valid? ::spec/limits body))
+    (if (valid-response ::spec/limits response)
       body
       (let [data {:status status
                   :body body}
@@ -564,8 +572,7 @@
   (let [params {:state "Closed"}
         response (request! client :post :async (str "/job/" id) params)
         {:keys [status body]} response]
-    (when (and (= 200 status)
-               (s/valid? ::job body)
+    (when (and (valid-response ::job response)
                (= "Closed" (:state body)))
       true)))
 
@@ -601,8 +608,7 @@
   (let [url (str "/job/" job-id "/batch/" batch-id "/result")
         response (request! client :get :async url {})
         {:keys [status body]} response]
-    (when (and (= 200 status)
-               (s/valid? ::batch-results body))
+    (when (valid-response ::batch-results response)
       body)))
 
 (def import-poll-timeout-ms
