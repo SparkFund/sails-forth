@@ -6,7 +6,7 @@ version detection.
 
 ## Installation
 
-`sparkfund/sails-forth 0.7.0`
+`sparkfund/sails-forth 0.8.0`
 
 ## Usage
 
@@ -48,7 +48,7 @@ Dates and datetimes will become joda localdates and dates, respectively.
 (sq/query client {:find [:contact :id :first-name :last-name]})
 (sq/query client {:find [:contact :id :first-name :last-name [:faction :id :name]]})
 (sq/query client {:find [:contact :id :first-name :last-name]
-                  :where [[:= :last-name "Organa"]]})
+                  :where [[:= [:contract :last-name] "Organa"]]})
 ```
 
 There is a memory client that operates on a schema and provides working impls of

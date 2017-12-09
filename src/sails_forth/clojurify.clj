@@ -100,7 +100,7 @@
   (s/or :datetime ::datetime
         :date ::date
         :int integer?
-        :bigdec bigdec?
+        :bigdec decimal?
         :other ::spec/json-simple))
 
 (s/fdef parse-value

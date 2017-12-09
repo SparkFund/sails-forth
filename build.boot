@@ -1,4 +1,4 @@
-(def version "0.7.0")
+(def version "0.8.0")
 
 (task-options!
   pom {:project 'sparkfund/sails-forth
@@ -9,15 +9,14 @@
  :resource-paths #{"src"}
  :source-paths #{"test"}
  :dependencies
- '[[adzerk/bootlaces "0.1.13" :scope "build"]
-   [adzerk/boot-jar2bin "1.1.0" :scope "build"]
+ '[[adzerk/bootlaces "0.1.13" :scope "test"]
+   [adzerk/boot-jar2bin "1.1.0" :scope "test"]
    [adzerk/boot-test "1.2.0" :scope "test"]
-   [big-solutions/boot-mvn "0.1.5"]
    [cheshire "5.5.0"]
    [clj-http "2.0.0"]
    [clj-time "0.11.0"]
    [com.github.jsqlparser/jsqlparser "0.9.5"]
-   [org.clojure/clojure "1.9.0-alpha17" :scope "provided"]
+   [org.clojure/clojure "1.9.0" :scope "provided"]
    [org.clojure/test.check "0.9.0" :scope "test"]
    [sparkfund/boot-spec-coverage "0.4.0" :scope "test"]]
  :repositories
@@ -26,7 +25,6 @@
 
 (require '[adzerk.boot-jar2bin :refer :all]
          '[adzerk.boot-test :as bt]
-         '[boot-mvn.core :refer [mvn]]
          '[clojure.java.io :as io]
          '[sparkfund.boot-spec-coverage :as cover])
 

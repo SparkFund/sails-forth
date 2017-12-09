@@ -1,3 +1,7 @@
+## 0.8.0
+
+* Update to clojure-1.9.0, also drop boot-mvn
+
 ## 0.7.0
 
 * Update to clojure-1.9.0alpha17 and clojure.spec.alpha
