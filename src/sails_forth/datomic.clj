@@ -1,7 +1,9 @@
 (ns sails-forth.datomic
   (:require [clj-time.coerce :as tc]
+            [clojure.set :as set]
             [clojure.string :as s]
             [sails-forth.client :as c]
+            [sails-forth.clojurify :as clj]
             [sails-forth.query :as q]))
 
 (def datomic-types
@@ -56,9 +58,9 @@
       :db/cardinality :db.cardinality/one}]))
 
 (defn object-schema
-  [ns-prefix type fields]
+  [ns-prefix object-key fields]
   (let [ns-prefix (name ns-prefix)
-        ns (str ns-prefix "." (name type))]
+        ns (str ns-prefix "." (name object-key))]
     (letfn [(enum-datoms [key field]
               (letfn [(enum-datom [item]
                         (let [ns (str ns "." (name key))
@@ -104,53 +106,53 @@
       (into [] (mapcat field-datoms) fields))))
 
 (defn build-schema!
-  [client ns-prefix types]
+  [client ns-prefix object-keys]
   (into (metadata-schema ns-prefix)
-        (mapcat (fn [type]
-                  (object-schema ns-prefix type (c/get-fields client type))))
-        types))
+        (mapcat (fn [object-key]
+                  (object-schema ns-prefix object-key (c/get-fields client object-key))))
+        object-keys))
 
-(defn assert-object
-  [ns-prefix type fields m]
+(defn assert-object!
+  [client ns-prefix object-key m]
   (let [ns-prefix (name ns-prefix)
-        ns (str ns-prefix "." (name type))]
-    (reduce-kv (fn [txn field value]
-                 (let [attr (keyword ns (name field))
-                       type (get-in fields [field :type])
-                       value (case type
-                               ;; TODO coordinate with enum-datom
-                               "picklist"
-                               (keyword (str ns "." (name field)) value)
-                               "multipicklist"
-                               (mapv (partial keyword (str ns "." (name field)))
-                                     (s/split value #";"))
-                               "date"
-                               (tc/to-date value)
-                               "reference"
-                               ;; TODO here's the good bit do we just recurse?
-                               ;; If so we need the the reference's type and
-                               ;; fields
-                               nil
-                               value)]
-                   (assoc txn attr value)))
-               {}
+        ns (str ns-prefix "." (name object-key))
+        fields (c/get-fields client object-key)]
+    (reduce-kv (fn [txn field-key value]
+                 (let [attr (keyword ns (name field-key))
+                       field (get fields field-key)
+                       {:keys [type referenceTo]} field
+                       [value ref-types]
+                       (case type
+                         ;; changes must be coordinated with enum-datom
+                         "picklist"
+                         [(keyword (str ns "." (name field-key)) value)]
+                         "multipicklist"
+                         [(mapv (partial keyword (str ns "." (name field-key)))
+                                (s/split value #";"))]
+                         "date"
+                         [(tc/to-date value)]
+                         "reference"
+                         (let [ref-key (clj/field->refers-attr field)
+                               ref-object (assert-object! client ns-prefix ref-key value)]
+                           [(dissoc ref-object ::types)
+                            (get ref-object ::types)])
+                         [value])]
+                   (-> txn
+                       (assoc attr value)
+                       (cond-> (seq ref-types)
+                         (update ::types into ref-types)))))
+               {::types #{object-key}}
                m)))
 
-;; TODO the problem with doing this generally is that the name of an object's
-;; reference is not always the same as the type, as in multiple references to
-;; accounts from an opportunity under different names. Those data are available
-;; we just need to figure out how to get at them sensibly.
 ;; TODO also do we want the whole schema for each type or just projections that
 ;; permit out query results
 (defn assert-query!
-  [client ns-prefix query])
-
-(comment
-  ;; TODO we could add metadata to the query results with the type of each query
-  ;; path, e.g.
-  ^{:path-types {[:opportunity] :opportunity
-                 [:opportunity :customer-account] :account}}
-  [{:opportunity [:customer-account {:name "Rey"}]}]
-  ;; This could also be the job of some local coordinator, but that ties a good
-  ;; bit of functionality to an impure fn
-  )
+  [client ns-prefix query]
+  (let [objects (into []
+                      (comp (map (comp first seq))
+                            (map (partial apply assert-object! client ns-prefix)))
+                      (q/query client query))
+        object-keys (reduce set/union #{} (map ::types objects))]
+    (into (build-schema! client ns-prefix object-keys)
+          (map (fn [m] (dissoc m ::types))
+               objects))))
