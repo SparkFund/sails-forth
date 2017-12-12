@@ -167,7 +167,8 @@
   "Returns a seq of transaction seqs that if transacted in order will assert
    the results of the given query in a datomic database.
 
-   Given an ns-prefix of `ex` and a query of `{:find [:customer :id :sectors]}`
+   Given an ns-prefix of `ex` and a query of
+   `{:find [:customer :id :sectors [:contact :id :phone]]}`
 
    The first transaction asserts a set of attributes that will be defined on the
    attributes that will model the salesforce fields where there is no direct
@@ -180,10 +181,17 @@
 
    The last transaction asserts the entities returned by the query.
 
-   Most field values have natural datomic types. Notably, however, picklist
-   and multipicklist fields are modeled as enums whose idents are a
-   keywordized version of the picklist value with a namespace derived from
-   the object and field, e.g. `ex.object.customer.sectors/energy-efficiency`."
+   Most field values have natural datomic types. Notable exceptions include:
+
+   * picklist, multipicklist: stored as strings. The api does not provide any
+     access to inactive picklist items, which makes asserting e.g. enum values
+     problematic
+   * recordtype references: stored as strings for similar reasons
+   * address: stored as component references
+
+   There are some modest restrictions on the queries that can be asserted.
+   All join references must include an identity field, except for recordtype
+   joins which must only include the `:name` field."
   [client ns-prefix query]
   (let [objects (into []
                       (comp (map (comp first seq))
