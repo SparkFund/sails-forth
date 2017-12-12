@@ -82,46 +82,43 @@
 
 (defn object-schema
   [ns-prefix object-key fields]
-  (let [ns-prefix (name ns-prefix)
-        ns (str ns-prefix "." (name object-key))]
-    (letfn [(enum-datoms [key field]
-              (letfn [(enum-datom [item]
-                        (let [ns (str ns "." (name key))
-                              {:keys [label value]} item]
-                          {:db/ident (enum-ident ns-prefix object-key key (picklist-name value))
-                           :db/doc label
-                           (field-ident ns-prefix "picklist-value") value}))]
-                (map enum-datom (:picklistValues field))))
-            (field-datoms [[key field]]
-              (let [{:keys [name
-                            label
-                            type
-                            calculatedFormula
-                            inlineHelpText
-                            unique]}
-                    field
-                    cardinality (if (= "multipicklist" type)
-                                  :db.cardinality/many
-                                  :db.cardinality/one)]
-                (cons (cond-> {:db/ident (field-attr ns-prefix object-key key)
-                               :db/doc label
-                               :db/valueType (get datomic-types type)
-                               :db/cardinality cardinality
-                               (field-ident ns-prefix "name") name
-                               (field-ident ns-prefix "type") type}
-                        ;; Sorta funny that id types don't have :unique true
-                        (or (= "id" type) unique)
-                        (assoc :db/unique :db.unique/identity)
-                        calculatedFormula
-                        (assoc (field-ident ns-prefix "formula") calculatedFormula)
-                        inlineHelpText
-                        (assoc (field-ident ns-prefix "helptext") inlineHelpText))
-                      (when (case type
-                              "picklist" true
-                              "multipicklist" true
-                              false)
-                        (enum-datoms key field)))))]
-      (into [] (mapcat field-datoms) fields))))
+  (letfn [(enum-datoms [key field]
+            (letfn [(enum-datom [item]
+                      (let [{:keys [label value]} item]
+                        {:db/ident (enum-ident ns-prefix object-key key (picklist-name value))
+                         :db/doc label
+                         (field-ident ns-prefix "picklist-value") value}))]
+              (map enum-datom (:picklistValues field))))
+          (field-datoms [[key field]]
+            (let [{:keys [name
+                          label
+                          type
+                          calculatedFormula
+                          inlineHelpText
+                          unique]}
+                  field
+                  cardinality (if (= "multipicklist" type)
+                                :db.cardinality/many
+                                :db.cardinality/one)]
+              (cons (cond-> {:db/ident (field-attr ns-prefix object-key key)
+                             :db/doc label
+                             :db/valueType (get datomic-types type)
+                             :db/cardinality cardinality
+                             (field-ident ns-prefix "name") name
+                             (field-ident ns-prefix "type") type}
+                      ;; Sorta funny that id types don't have :unique true
+                      (or (= "id" type) unique)
+                      (assoc :db/unique :db.unique/identity)
+                      calculatedFormula
+                      (assoc (field-ident ns-prefix "formula") calculatedFormula)
+                      inlineHelpText
+                      (assoc (field-ident ns-prefix "helptext") inlineHelpText))
+                    (when (case type
+                            "picklist" true
+                            "multipicklist" true
+                            false)
+                      (enum-datoms key field)))))]
+    (into [] (mapcat field-datoms) fields)))
 
 (defn build-schema!
   [client ns-prefix object-keys]
@@ -133,9 +130,7 @@
 
 (defn assert-object!
   [client ns-prefix object-key m]
-  (let [ns-prefix (name ns-prefix)
-        ns (str ns-prefix "." (name object-key))
-        fields (c/get-fields client object-key)]
+  (let [fields (c/get-fields client object-key)]
     (reduce-kv (fn [txn field-key value]
                  (let [attr (field-attr ns-prefix object-key field-key)
                        field (get fields field-key)
