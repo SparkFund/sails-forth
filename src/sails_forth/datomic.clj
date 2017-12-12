@@ -12,7 +12,6 @@
    "date" :db.type/instant
    "int" :db.type/long
    "percent" :db.type/bigdec
-   "double" :db.type/bigdec
    "currency" :db.type/bigdec
    "id" :db.type/string
    "string" :db.type/string
@@ -91,12 +90,19 @@
                   cardinality (if (= "multipicklist" type)
                                 :db.cardinality/many
                                 :db.cardinality/one)
-                  recordtype? (= key :recordtype)]
+                  recordtype? (= key :recordtype)
+                  valuetype (cond
+                              recordtype? :db.type/string
+                              (= "double" type)
+                              (case (clj/double-type field)
+                                :long :db.type/long
+                                :bigint :db.type/bigint
+                                :bigdec :db.type/bigdec)
+                              :else
+                              (get datomic-types type))]
               (cond-> {:db/ident (field-attr ns-prefix object-key key)
                        :db/doc label
-                       :db/valueType (if-not recordtype?
-                                       (get datomic-types type)
-                                       :db.type/string)
+                       :db/valueType valuetype
                        :db/cardinality cardinality
                        (field-ident ns-prefix "name") name
                        (field-ident ns-prefix "type") type}
