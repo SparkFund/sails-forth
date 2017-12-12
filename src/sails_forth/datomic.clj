@@ -56,6 +56,7 @@
     :db/doc "Salesforce field help text"
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one}
+
    {:db/ident (compound-ident ns-prefix "address" "street")
     :db/doc "Salesforce address street"
     :db/valueType :db.type/string
@@ -89,10 +90,13 @@
                   field
                   cardinality (if (= "multipicklist" type)
                                 :db.cardinality/many
-                                :db.cardinality/one)]
+                                :db.cardinality/one)
+                  recordtype? (= key :recordtype)]
               (cond-> {:db/ident (field-attr ns-prefix object-key key)
                        :db/doc label
-                       :db/valueType (get datomic-types type)
+                       :db/valueType (if-not recordtype?
+                                       (get datomic-types type)
+                                       :db.type/string)
                        :db/cardinality cardinality
                        (field-ident ns-prefix "name") name
                        (field-ident ns-prefix "type") type}
@@ -122,6 +126,7 @@
                  (let [attr  (field-attr ns-prefix object-key field-key)
                        field (get fields field-key)
                        {:keys [type referenceTo]} field
+                       recordtype? (= field-key :recordtype)
                        [value ref-types]
                        (case type
                          "multipicklist"
@@ -129,10 +134,12 @@
                          "date"
                          [(tc/to-date value)]
                          "reference"
-                         (let [ref-key (clj/field->refers-attr field)
-                               ref-object (assert-object! client ns-prefix ref-key value)]
-                           [(dissoc ref-object ::types)
-                            (get ref-object ::types)])
+                         (if-not recordtype?
+                           (let [ref-key (clj/field->refers-attr field)
+                                 ref-object (assert-object! client ns-prefix ref-key value)]
+                             [(dissoc ref-object ::types)
+                              (get ref-object ::types)])
+                           [(get value :name)])
                          "address"
                          (let [{:keys [street city stateCode postalCode countryCode]} value
                                attr (partial compound-ident ns-prefix "address")]
