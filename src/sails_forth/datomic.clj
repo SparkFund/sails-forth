@@ -63,22 +63,21 @@
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one}])
 
-(def picklist-name
-  (let [allowed-punct (into #{} "*+!-_'?")]
-    (fn [picklist-value]
-      (let [sb (StringBuffer.)]
-        (doseq [c (seq picklist-value)]
-          (cond (and (zero? (.length sb))
-                     (Character/isDigit c))
-                nil
-                (or (Character/isLetterOrDigit c)
-                    (contains? allowed-punct c))
-                (.append sb (Character/toLowerCase c))
-                :else
-                (.append sb \-)))
-        (-> (.toString sb)
-            (s/replace #"-+" "-")
-            (s/replace #"^-|-$" ""))))))
+(defn picklist-name
+  [picklist-value]
+  (let [sb (StringBuffer.)]
+    (doseq [c (seq picklist-value)]
+      (cond (and (zero? (.length sb))
+                 (Character/isDigit c))
+            nil
+            (or (Character/isLetterOrDigit c)
+                (case c (\* \+ \! \- \_ \' \?) true false))
+            (.append sb (Character/toLowerCase c))
+            :else
+            (.append sb \-)))
+    (-> (.toString sb)
+        (s/replace #"-+" "-")
+        (s/replace #"^-|-$" ""))))
 
 (defn object-schema
   [ns-prefix object-key fields]

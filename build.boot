@@ -15,6 +15,7 @@
    [cheshire "5.5.0"]
    [clj-http "2.0.0"]
    [clj-time "0.11.0"]
+   [com.datomic/datomic-free "0.9.5561.62" :scope "test"]
    [com.github.jsqlparser/jsqlparser "0.9.5"]
    [org.clojure/clojure "1.9.0" :scope "provided"]
    [org.clojure/test.check "0.9.0" :scope "test"]
