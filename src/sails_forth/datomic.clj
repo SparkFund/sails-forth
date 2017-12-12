@@ -19,13 +19,11 @@
    "reference" :db.type/ref
    "boolean" :db.type/boolean
    "textarea" :db.type/string
-   "picklist" :db.type/ref
+   "picklist" :db.type/string
    "url" :db.type/uri
-   "multipicklist" :db.type/ref
-   ;; maybe components? Do these have discrete pieces?
-   ;; "address" :db.type/string
-   ;; "phone" :db.type/string
-   })
+   "multipicklist" :db.type/string
+   "phone" :db.type/string
+   "address" :db.type/ref})
 
 (defn field-ident
   [ns-prefix field-name]
@@ -35,9 +33,9 @@
   [ns-prefix object-name field-name]
   (keyword (str (name ns-prefix) ".object." (name object-name)) (name field-name)))
 
-(defn enum-ident
-  [ns-prefix object-name field-name value]
-  (keyword (str (name ns-prefix) ".object." (name object-name) "." (name field-name)) (name value)))
+(defn compound-ident
+  [ns-prefix compound-name field-name]
+  (keyword (str (name ns-prefix) ".compoound." (name compound-name)) (name field-name)))
 
 (defn metadata-schema
   [ns-prefix]
@@ -58,37 +56,30 @@
     :db/doc "Salesforce field help text"
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one}
-   {:db/ident (field-ident ns-prefix "picklist-value")
-    :db/doc "Salesforce field picklist value"
+   {:db/ident (compound-ident ns-prefix "address" "street")
+    :db/doc "Salesforce address street"
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   {:db/ident (compound-ident ns-prefix "address" "city")
+    :db/doc "Salesforce address city"
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   {:db/ident (compound-ident ns-prefix "address" "state-code")
+    :db/doc "Salesforce address state"
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   {:db/ident (compound-ident ns-prefix "address" "postal-code")
+    :db/doc "Salesforce address postal code"
+    :db/valueType :db.type/string
+    :db/cardinality :db.cardinality/one}
+   {:db/ident (compound-ident ns-prefix "address" "country-code")
+    :db/doc "Salesforce address country"
     :db/valueType :db.type/string
     :db/cardinality :db.cardinality/one}])
 
-(defn picklist-name
-  [picklist-value]
-  (let [sb (StringBuffer.)]
-    (doseq [c (seq picklist-value)]
-      (cond (and (zero? (.length sb))
-                 (Character/isDigit c))
-            nil
-            (or (Character/isLetterOrDigit c)
-                (case c (\* \+ \! \- \_ \' \?) true false))
-            (.append sb (Character/toLowerCase c))
-            :else
-            (.append sb \-)))
-    (-> (.toString sb)
-        (s/replace #"-+" "-")
-        (s/replace #"^-|-$" ""))))
-
 (defn object-schema
   [ns-prefix object-key fields]
-  (letfn [(enum-datoms [key field]
-            (letfn [(enum-datom [item]
-                      (let [{:keys [label value]} item]
-                        {:db/ident (enum-ident ns-prefix object-key key (picklist-name value))
-                         :db/doc label
-                         (field-ident ns-prefix "picklist-value") value}))]
-              (map enum-datom (:picklistValues field))))
-          (field-datoms [[key field]]
+  (letfn [(field-datoms [[key field]]
             (let [{:keys [name
                           label
                           type
@@ -99,25 +90,22 @@
                   cardinality (if (= "multipicklist" type)
                                 :db.cardinality/many
                                 :db.cardinality/one)]
-              (cons (cond-> {:db/ident (field-attr ns-prefix object-key key)
-                             :db/doc label
-                             :db/valueType (get datomic-types type)
-                             :db/cardinality cardinality
-                             (field-ident ns-prefix "name") name
-                             (field-ident ns-prefix "type") type}
-                      ;; Sorta funny that id types don't have :unique true
-                      (or (= "id" type) unique)
-                      (assoc :db/unique :db.unique/identity)
-                      calculatedFormula
-                      (assoc (field-ident ns-prefix "formula") calculatedFormula)
-                      inlineHelpText
-                      (assoc (field-ident ns-prefix "helptext") inlineHelpText))
-                    (when (case type
-                            "picklist" true
-                            "multipicklist" true
-                            false)
-                      (enum-datoms key field)))))]
-    (into [] (mapcat field-datoms) fields)))
+              (cond-> {:db/ident (field-attr ns-prefix object-key key)
+                       :db/doc label
+                       :db/valueType (get datomic-types type)
+                       :db/cardinality cardinality
+                       (field-ident ns-prefix "name") name
+                       (field-ident ns-prefix "type") type}
+                ;; Sorta funny that id types don't have :unique true
+                (or (= "id" type) unique)
+                (assoc :db/unique :db.unique/identity)
+                (= "address" type)
+                (assoc :db/isComponent true)
+                calculatedFormula
+                (assoc (field-ident ns-prefix "formula") calculatedFormula)
+                inlineHelpText
+                (assoc (field-ident ns-prefix "helptext") inlineHelpText))))]
+    (into [] (map field-datoms) fields)))
 
 (defn build-schema!
   [client ns-prefix object-keys]
@@ -131,18 +119,13 @@
   [client ns-prefix object-key m]
   (let [fields (c/get-fields client object-key)]
     (reduce-kv (fn [txn field-key value]
-                 (let [attr (field-attr ns-prefix object-key field-key)
+                 (let [attr  (field-attr ns-prefix object-key field-key)
                        field (get fields field-key)
                        {:keys [type referenceTo]} field
                        [value ref-types]
                        (case type
-                         "picklist"
-                         (enum-ident ns-prefix object-key field-key (picklist-name value))
                          "multipicklist"
-                         [(into []
-                                (map (comp (partial enum-ident ns-prefix object-key field-key)
-                                           picklist-name))
-                                (s/split value #";"))]
+                         [(s/split value #";")]
                          "date"
                          [(tc/to-date value)]
                          "reference"
@@ -150,6 +133,15 @@
                                ref-object (assert-object! client ns-prefix ref-key value)]
                            [(dissoc ref-object ::types)
                             (get ref-object ::types)])
+                         "address"
+                         (let [{:keys [street city stateCode postalCode countryCode]} value
+                               attr (partial compound-ident ns-prefix "address")]
+                           [(cond-> {}
+                              street (assoc (attr "street") street)
+                              city (assoc (attr "city") city)
+                              stateCode (assoc (attr "state-code") stateCode)
+                              postalCode (assoc (attr "postal-code") postalCode)
+                              countryCode (assoc (attr "country-code") countryCode))])
                          [value])]
                    (-> txn
                        (assoc attr value)
