@@ -155,6 +155,14 @@
                               stateCode (assoc (attr "state-code") stateCode)
                               postalCode (assoc (attr "postal-code") postalCode)
                               countryCode (assoc (attr "country-code") countryCode))])
+                         "currency"
+                         (try
+                           [(.setScale value 2)]
+                           (catch ArithmeticException e
+                             (throw (ex-info e "Could not set currency to pennies"
+                                             {:value value
+                                              :field field-key
+                                              :object object-key}))))
                          [value])]
                    (-> txn
                        (assoc attr value)
