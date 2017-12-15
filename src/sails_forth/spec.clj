@@ -65,7 +65,7 @@
 (s/def ::picklistValue
   (s/keys :req-un [
                    ; label can be nil in a picklistValue, is that correct? Awkward to express.
-                   ; ::label 
+                   ; ::label
 
                    ::value
                    ::active]))
@@ -89,7 +89,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "id" [_] 
+(defmethod field-description-type "id" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -98,7 +98,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "string" [_] 
+(defmethod field-description-type "string" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -107,7 +107,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "reference" [_] 
+(defmethod field-description-type "reference" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -116,7 +116,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "boolean" [_] 
+(defmethod field-description-type "boolean" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -125,7 +125,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "textarea" [_] 
+(defmethod field-description-type "textarea" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -134,7 +134,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "picklist" [_] 
+(defmethod field-description-type "picklist" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -143,7 +143,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "url" [_] 
+(defmethod field-description-type "url" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -152,7 +152,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "multipicklist" [_] 
+(defmethod field-description-type "multipicklist" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -161,7 +161,7 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "address" [_] 
+(defmethod field-description-type "address" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name
@@ -170,7 +170,16 @@
                    ::precision
                    ::label
                    ::relationshipName]))
-(defmethod field-description-type "phone" [_] 
+(defmethod field-description-type "phone" [_]
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
+(defmethod field-description-type "email" [_]
   (s/keys :req-un [::type
                    ::picklistValues
                    ::name

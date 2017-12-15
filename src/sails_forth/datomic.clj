@@ -22,7 +22,8 @@
    "url" :db.type/uri
    "multipicklist" :db.type/string
    "phone" :db.type/string
-   "address" :db.type/ref})
+   "address" :db.type/ref
+   "email" :db.type/string})
 
 (defn field-ident
   [ns-prefix field-name]
