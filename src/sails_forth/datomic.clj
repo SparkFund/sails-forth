@@ -167,16 +167,16 @@
   "Returns a seq of transaction seqs that if transacted in order will assert
    the results of the given query in a datomic database.
 
-   Given an ns-prefix of `ex` and a query of
+   Given an ns-prefix of `\"sf\"` and a query of
    `{:find [:customer :id :sectors [:contact :id :phone]]}`:
 
    The first transaction asserts a set of attributes that will be defined on the
    attributes that will model the salesforce fields where there is no direct
-   datomic analog, e.g. `ex.field/helptext`.
+   datomic analog, e.g. `sf.field/helptext`.
 
    The second transaction asserts a set of attributes that model the
    fields of objects used in the query,
-   e.g. `ex.object.customer/id`. Note this is a complete set of
+   e.g. `sf.object.customer/id`. Note this is a complete set of
    attributes, not limited simply to those used in the query.
 
    The last transaction asserts the entities returned by the query.
