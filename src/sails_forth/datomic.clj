@@ -157,12 +157,14 @@
                               countryCode (assoc (attr "country-code") countryCode))])
                          "currency"
                          (try
-                           [(.setScale value 2)]
+                           [(.setScale value 2 BigDecimal/ROUND_UP)]
                            (catch ArithmeticException e
-                             (throw (ex-info e "Could not set currency to pennies"
+                             (throw (ex-info "Could not set currency to pennies"
                                              {:value value
                                               :field field-key
-                                              :object object-key}))))
+                                              :object-type object-key
+                                              :object m}
+                                             e))))
                          [value])]
                    (-> txn
                        (assoc attr value)
