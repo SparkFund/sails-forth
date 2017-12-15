@@ -155,16 +155,6 @@
                               stateCode (assoc (attr "state-code") stateCode)
                               postalCode (assoc (attr "postal-code") postalCode)
                               countryCode (assoc (attr "country-code") countryCode))])
-                         "currency"
-                         (try
-                           [(.setScale value 2 BigDecimal/ROUND_UP)]
-                           (catch ArithmeticException e
-                             (throw (ex-info "Could not set currency to pennies"
-                                             {:value value
-                                              :field field-key
-                                              :object-type object-key
-                                              :object m}
-                                             e))))
                          [value])]
                    (-> txn
                        (assoc attr value)
@@ -178,7 +168,7 @@
    the results of the given query in a datomic database.
 
    Given an ns-prefix of `ex` and a query of
-   `{:find [:customer :id :sectors [:contact :id :phone]]}`
+   `{:find [:customer :id :sectors [:contact :id :phone]]}`:
 
    The first transaction asserts a set of attributes that will be defined on the
    attributes that will model the salesforce fields where there is no direct
