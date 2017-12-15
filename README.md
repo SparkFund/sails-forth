@@ -6,7 +6,7 @@ version detection.
 
 ## Installation
 
-`sparkfund/sails-forth 0.8.0`
+`sparkfund/sails-forth 0.8.1`
 
 ## Usage
 
@@ -58,6 +58,16 @@ straightforward.
 
 ``` clojure
 (def mc (sf/build-memory-client (sf/schema client #{:contact})))
+```
+
+There is support for building transactions which can be applied to datomic
+to record observations from salesforce queries:
+
+``` clojure
+(require '[sails-forth.datomic :as sd])
+
+(def txns
+  (sd/assert-query client "sf" {:find [:opportunity :id :name [:customer :id :name]]}))
 ```
 
 ## Configuration
