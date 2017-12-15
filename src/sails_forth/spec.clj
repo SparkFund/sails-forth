@@ -188,6 +188,15 @@
                    ::precision
                    ::label
                    ::relationshipName]))
+(defmethod field-description-type "encryptedstring" [_]
+  (s/keys :req-un [::type
+                   ::picklistValues
+                   ::name
+                   ::referenceTo
+                   ::scale
+                   ::precision
+                   ::label
+                   ::relationshipName]))
 
 (s/def ::field-description
   (s/multi-spec field-description-type :type))

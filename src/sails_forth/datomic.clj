@@ -23,7 +23,8 @@
    "multipicklist" :db.type/string
    "phone" :db.type/string
    "address" :db.type/ref
-   "email" :db.type/string})
+   "email" :db.type/string
+   "encryptedstring" :db.type/string})
 
 (defn field-ident
   [ns-prefix field-name]
