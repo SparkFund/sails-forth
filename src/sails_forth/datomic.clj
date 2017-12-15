@@ -142,7 +142,7 @@
                          "reference"
                          (if-not recordtype?
                            (let [ref-key (clj/field->refers-attr field)
-                                 ref-object (assert-object! client ns-prefix ref-key value)]
+                                 ref-object (assert-object client ns-prefix ref-key value)]
                              [(dissoc ref-object ::types)
                               (get ref-object ::types)])
                            [(get value :name)])
@@ -195,8 +195,8 @@
   [client ns-prefix query]
   (let [objects (into []
                       (comp (map (comp first seq))
-                            (map (partial apply assert-object! client ns-prefix)))
+                            (map (partial apply assert-object client ns-prefix)))
                       (q/query client query))
         object-keys (reduce set/union #{} (map ::types objects))]
-    (conj (build-schema! client ns-prefix object-keys)
+    (conj (build-schema client ns-prefix object-keys)
           (into [] (map (fn [m] (dissoc m ::types)) objects)))))
