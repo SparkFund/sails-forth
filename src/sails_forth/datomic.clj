@@ -117,7 +117,7 @@
                 (assoc (field-ident ns-prefix "helptext") inlineHelpText))))]
     (into [] (map field-datoms) fields)))
 
-(defn build-schema!
+(defn build-schema
   [client ns-prefix object-keys]
   [(metadata-schema ns-prefix)
    (into []
@@ -125,7 +125,7 @@
                    (object-schema ns-prefix object-key (c/get-fields client object-key))))
          object-keys)])
 
-(defn assert-object!
+(defn assert-object
   [client ns-prefix object-key m]
   (let [fields (c/get-fields client object-key)]
     (reduce-kv (fn [txn field-key value]
@@ -163,7 +163,7 @@
                {::types #{object-key}}
                m)))
 
-(defn assert-query!
+(defn assert-query
   "Returns a seq of transaction seqs that if transacted in order will assert
    the results of the given query in a datomic database.
 
