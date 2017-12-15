@@ -1,3 +1,7 @@
+## 0.8.1
+
+* Introduce sails-forth.datomic ns with assert-query fn
+
 ## 0.8.0
 
 * Update to clojure-1.9.0, also drop boot-mvn

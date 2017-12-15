@@ -110,6 +110,16 @@
   ;; TODO could specify that render-value is the inverse
   )
 
+(def double-type
+  (let [max-long-precision (dec (count (str Long/MAX_VALUE)))]
+    (fn [field]
+      (let [{:keys [scale precision]} field]
+        (if (zero? scale)
+          (if (<= precision max-long-precision)
+            :long
+            :bigint)
+          :bigdec)))))
+
 (def parse-value
   "Parses the given value according to its field type and other characteristics"
   (let [date-time-formatter (tf/formatters :date-time)
@@ -120,11 +130,10 @@
         (case type
           "datetime" (tf/parse date-time-formatter value)
           "date" (tc/to-local-date (tf/parse date-formatter value))
-          "double" (if (= 0 scale)
-                     (if (<= precision max-long-precision)
-                       (long value)
-                       (bigint value))
-                     value)
+          "double" ((case (double-type field)
+                      :long long
+                      :bigint bigint
+                      :bigdec bigdec) value)
           "int" (long value)
           "percent" (/ value 100M)
           value)))))
