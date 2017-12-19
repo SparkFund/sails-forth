@@ -36,7 +36,7 @@
                    fields')))))))
 
 (s/def ::where-operator
-  #{:in := :or})
+  #{:in := :not-in :or})
 
 (s/def ::where-value
   (s/or :string string?
@@ -63,7 +63,7 @@
   (case op
     :or (str "(" (string/join ") OR (" (map soql-where* args)) ")")
     (let [[lh rh] args]
-      (str (soql-value lh) " " (name op) " " (soql-value rh)))))
+      (str (soql-value lh) " " (string/replace (name op) #"-" " ") " " (soql-value rh)))))
 
 (s/fdef soql-where*
   :args (s/cat :clauses (s/coll-of ::where-clause))
