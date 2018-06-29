@@ -87,7 +87,7 @@
   string?)
 
 (s/def ::client-id
-  int?)
+  string?)
 
 (s/def ::signing-key
   string?)
