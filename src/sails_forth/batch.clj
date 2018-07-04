@@ -1,5 +1,15 @@
 (ns sails-forth.batch
-  (:require [sails-forth.http :as http]))
+  (:require [clojure.spec.alpha :as s]
+            [sails-forth.http :as http]
+            [sails-forth.spec :as spec]))
+
+(s/def ::batch-response (s/coll-of map?))
+
+(s/fdef batch!
+        :args (s/cat :client ::http/client
+                     :type ::spec/type
+                     :attrs ::spec/attrs)
+        :ret ::batch-response)
 
 (defn batch!
   [client type reqs]
