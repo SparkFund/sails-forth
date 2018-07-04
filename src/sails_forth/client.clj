@@ -1,5 +1,6 @@
 (ns sails-forth.client
   (:require [clojure.spec.alpha :as s]
+            [sails-forth.batch :as batch]
             [sails-forth.http :as http]
             [sails-forth.memory :as memory]
             [sails-forth.spec :as spec]
@@ -80,6 +81,11 @@
   (take-action!
     [_ action inputs]
     "Submits a request to perform the given action"))
+
+(defprotocol batch-requestable
+  (batch! [this requests]
+    "Batchs requests together, returns batch uri. Requests is a collection of request maps as per the salesforce batch
+     REST API."))
 
 (s/def ::client
   (partial satisfies? Client))
@@ -189,7 +195,10 @@
       (describe-action! [_ action]
         (http/describe-action! client action))
       (take-action! [_ action inputs]
-        (http/take-action! client action inputs)))))
+        (http/take-action! client action inputs))
+      batch-requestable
+      (batch! [_ requests]
+        (batch/batch! client "batch" requests)))))
 
 (s/fdef build-memory-client
   :args (s/cat :schema ::memory/schema)
