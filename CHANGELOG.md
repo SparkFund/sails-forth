@@ -1,3 +1,8 @@
+## 0.9.0
+
+* Added JWT authentication
+* Added Batch requesting to http client
+
 ## 0.8.1
 
 * Introduce sails-forth.datomic ns with assert-query fn
