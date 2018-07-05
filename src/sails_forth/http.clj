@@ -159,9 +159,16 @@
 
 (defn ^:spark/no-boot-spec-coverage authenticate
   [config]
-  (let [{:keys [host username client-id signing-key]} config
-        params {:grant_type "urn:ietf:params:oauth:grant-type:jwt-bearer"
-                :assertion  (jwt-token host client-id username signing-key)}
+  (let [{:keys [host username password token consumer-key consumer-secret
+                client-id signing-key]} config
+        params (if signing-key
+                 {:grant_type "urn:ietf:params:oauth:grant-type:jwt-bearer"
+                  :assertion  (jwt-token host client-id username signing-key)}
+                 {:username username
+                  :password (str password token)
+                  :client_id consumer-key
+                  :client_secret consumer-secret
+                  :grant_type "password"})
         url (str host "/services/oauth2/token")
         ;; TODO this is just like json-request except the body is form encoded
         request {:method :post
