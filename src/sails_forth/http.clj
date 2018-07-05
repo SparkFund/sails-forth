@@ -1,6 +1,10 @@
 (ns sails-forth.http
-  (:require [cheshire.parse]
+  (:require [buddy.sign.jwt :as jwt]
+            [buddy.core.keys :as keys]
+            [cheshire.parse]
             [clj-http.client :as http]
+            [clj-time.coerce :as tc]
+            [clj-time.core :as time]
             [clojure.spec.alpha :as s]
             [sails-forth.spec :as spec]))
 
@@ -82,10 +86,10 @@
 (s/def ::token
   string?)
 
-(s/def ::consumer-key
+(s/def ::client-id
   string?)
 
-(s/def ::consumer-secret
+(s/def ::signing-key
   string?)
 
 (s/def ::version
@@ -102,10 +106,8 @@
 
 (s/def ::config
   (s/keys :req-un [::username
-                   ::password
-                   ::token
-                   ::consumer-key
-                   ::consumer-secret]
+                   ::client-id
+                   ::signing-key]
           :opt-un [::version
                    ::sandbox?
                    ::host
@@ -127,19 +129,47 @@
                    ::version-url
                    ::version]))
 
+(s/fdef jwt-token
+  :args (s/cat :aud string? :iss int? :sub string? :key string?)
+  :ret string?)
+
+(defn jwt-token
+  "Generates a temporary JWT token with a 5min lifetime. Necessary to acquire a Salesforce Access Token.
+  
+  Arguments:
+    aud - SF authentication server
+    iss - Salesforce client id (in this case this is the application id of the connected app)
+    sub - Salesforce username (email) to access the connected app
+    key - Private key associated with the connected app for signing the JWT token
+    
+  Returns a signed JWT token, valid for 5 minutes since the fn call."
+  [aud iss sub key]
+  (let [pkey      (keys/private-key key)
+        jwt-token (jwt/sign {:iss iss,
+                             :sub sub,
+                             :aud aud,
+                             :exp (+ (tc/to-epoch (time/now)) (* 5 60))}
+                            pkey
+                            {:alg :rs256})]
+    jwt-token))
+
 (s/fdef authenticate
   :args (s/cat :config ::config)
   :ret ::authentication)
 
 (defn ^:spark/no-boot-spec-coverage authenticate
   [config]
-  (let [{:keys [host username password token consumer-key consumer-secret]} config
-        params {:username username
-                :password (str password token)
-                :client_id consumer-key
-                :client_secret consumer-secret
-                :grant_type "password"}
-        url (str "https://" host "/services/oauth2/token")
+  (let [{:keys [host username password token consumer-key consumer-secret
+                client-id signing-key]} config
+        params (if signing-key
+                 {:grant_type "urn:ietf:params:oauth:grant-type:jwt-bearer"
+                  :assertion  (jwt-token host client-id username signing-key)}
+                 {:username username
+                  :password (str password token)
+                  :client_id consumer-key
+                  :client_secret consumer-secret
+                  :grant_type "password"})
+        url (str host "/services/oauth2/token")
         ;; TODO this is just like json-request except the body is form encoded
         request {:method :post
                  :url url

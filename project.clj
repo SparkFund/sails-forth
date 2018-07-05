@@ -1,9 +1,11 @@
-(defproject sparkfund/sails-forth "0.6.0-alpha1"
+(defproject sparkfund/sails-forth "0.9.0"
   :description "A Salesforce library"
   :url "http://github.com/sparkfund/sails-forth"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[cheshire "5.5.0"]
+  :dependencies [[buddy/buddy-core "1.2.0"]
+                 [buddy/buddy-sign "1.1.0"]
+                 [cheshire "5.5.0"]
                  [clj-http "2.0.0"]
                  [clj-time "0.11.0"]
                  [com.github.jsqlparser/jsqlparser "0.9.5"]
