@@ -48,4 +48,7 @@
                [{:payment {}} ; TODO is this right? who knows
                 {:payment {:actual-date (org.joda.time.LocalDate. "2016-01-01")}}]))))
     (testing "limits"
-      (is (= {} (sf/limits! client))))))
+      (is (= {} (sf/limits! client))))
+    (testing "take-action!"
+      (let [input [{"inputs" "Some argument"}]]
+        (is (= input (sf/take-action! client "custom/apex/SomeEndpoint" input)))))))

@@ -221,7 +221,9 @@
       (import! [_ type records]
         (future (mapv (partial create! type) records)))
       (cache [_]
-        cache))))
+        cache)
+      (take-action! [_ action inputs]
+        inputs))))
 
 (defn client?
   [x]
