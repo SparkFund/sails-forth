@@ -196,32 +196,36 @@
   :ret ::client)
 
 (defn build-memory-client
-  [schema]
-  (let [client (memory/create-state! schema)
-        cache (build-atomic-cache)]
-    (reify Client
-      (create! [_ type attrs]
-        (memory/create! client type attrs))
-      (delete! [_ type id]
-        (memory/delete! client type id))
-      (update! [_ type id attrs]
-        (memory/update! client type id attrs))
-      (list! [_ type]
-        (memory/list! client type))
-      (describe! [_ type]
-        (memory/describe! client type))
-      (objects! [_]
-        (memory/objects! client))
-      (query! [_ query]
-        (memory/query! client query))
-      (count! [_ query]
-        (memory/count! client query))
-      (limits! [_]
-        (memory/limits! client))
-      (import! [_ type records]
-        (future (mapv (partial create! type) records)))
-      (cache [_]
-        cache))))
+  ([schema]
+   (build-memory-client schema {}))
+  ([schema take-action-map]
+   (let [client (memory/create-state! schema)
+         cache (build-atomic-cache)]
+     (reify Client
+       (create! [_ type attrs]
+         (memory/create! client type attrs))
+       (delete! [_ type id]
+         (memory/delete! client type id))
+       (update! [_ type id attrs]
+         (memory/update! client type id attrs))
+       (list! [_ type]
+         (memory/list! client type))
+       (describe! [_ type]
+         (memory/describe! client type))
+       (objects! [_]
+         (memory/objects! client))
+       (query! [_ query]
+         (memory/query! client query))
+       (count! [_ query]
+         (memory/count! client query))
+       (limits! [_]
+         (memory/limits! client))
+       (import! [_ type records]
+         (future (mapv (partial create! type) records)))
+       (cache [_]
+         cache)
+       (take-action! [_ action inputs]
+         (memory/take-action! client take-action-map action inputs))))))
 
 (defn client?
   [x]
