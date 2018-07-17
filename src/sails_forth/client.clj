@@ -191,8 +191,14 @@
       (take-action! [_ action inputs]
         (http/take-action! client action inputs)))))
 
+(s/def ::take-action-map
+  (s/? (s/map-of string? (s/fdef f :args (s/cat :client any?
+                                                :inputs (s/coll-of (s/map-of string? any?)))
+                                   :ret any?))))
+
 (s/fdef build-memory-client
-  :args (s/cat :schema ::memory/schema)
+  :args (s/cat :schema ::memory/schema
+               :take-action-map ::take-action-map)
   :ret ::client)
 
 (defn build-memory-client
