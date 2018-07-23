@@ -274,3 +274,10 @@
 (defn limits!
   [astate]
   {})
+
+(defn take-action!
+  [astate take-action-map action inputs]
+  (if-let [f (get take-action-map action)]
+    (f astate inputs)
+    (throw (ex-info "action failed" {:cause (str action " not implemented")
+                                     :take-action-map take-action-map}))))

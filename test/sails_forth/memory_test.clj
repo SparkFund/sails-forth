@@ -9,7 +9,7 @@
 
 (deftest test-memory-client
   (let [schema (edn/read-string (slurp "test/schema.edn"))
-        client (sf/build-memory-client schema)]
+        client (sf/build-memory-client schema {"custom/apex/TestEndpoint" (fn [c inputs] inputs)})]
     (testing "schema"
       (is (= #{"Payment__c" "User"}
              (set (map :name (:sobjects (sf/objects! client))))))
@@ -48,4 +48,7 @@
                [{:payment {}} ; TODO is this right? who knows
                 {:payment {:actual-date (org.joda.time.LocalDate. "2016-01-01")}}]))))
     (testing "limits"
-      (is (= {} (sf/limits! client))))))
+      (is (= {} (sf/limits! client))))
+    (testing "take-action!"
+      (is (= "some input" (sf/take-action! client "custom/apex/TestEndpoint" "some input")))
+      (is (thrown? clojure.lang.ExceptionInfo (sf/take-action! client "custom/apex/BadEndpoint" "other input"))))))
