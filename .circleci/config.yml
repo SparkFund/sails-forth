@@ -1,0 +1,27 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/clojure:boot-2.7.2
+    steps:
+      - checkout
+
+      #Install & cache dependencies
+      - restore_cache:
+          key: sparkfund--{{ .Environment.CIRCLE_PROJECT_REPONAME }}--maven-deps--{{ checksum "build.boot" }}
+          key: sparkfund--{{ .Environment.CIRCLE_PROJECT_REPONAME }}--maven-deps
+      - run:
+          name: List Machine Info
+          command: java -version; echo; boot --version
+      - run:
+          name: Install Dependencies
+          command: boot deps
+      - save_cache:
+          key: sparkfund--{{ .Environment.CIRCLE_PROJECT_REPONAME }}--maven-deps--{{ checksum "build.boot" }}
+          paths:
+            - "~/.m2"
+            - "~/.boot"
+      
+      - run:
+          name: Run Tests
+          command: boot spec-coverage
