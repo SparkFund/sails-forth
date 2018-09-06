@@ -7,6 +7,13 @@
             [sails-forth.query :refer :all]
             [sails-forth.test :as test]))
 
+(deftest test-soql-value
+  (is (= "''" (soql-value "")))
+  (is (= "'test'" (soql-value "test")))
+  (is (= "'escape\\\\backslashes'" (soql-value "escape\\backslashes")))
+  (is (= "'escape\\nnewlines'" (soql-value "escape\nnewlines")))
+  (is (= "'escape\\'quotes'" (soql-value "escape'quotes"))))
+
 ;;; NOTE these tests are not guaranteed to work on arbitrary salesforce dbs
 
 (deftest ^:integration test-soql-query

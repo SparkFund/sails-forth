@@ -9,11 +9,18 @@
 (defprotocol SoqlValue
   (soql-value [_]))
 
+(defn soql-string-escape
+  [s]
+  (-> s
+    (string/replace #"\\" (string/re-quote-replacement "\\\\"))
+    (string/replace #"\n" (string/re-quote-replacement "\\n"))
+    (string/replace #"'" (string/re-quote-replacement "\\'"))))
+
 ;; TODO figure out how to annotate these impls
 (extend-protocol SoqlValue
   String
   (soql-value [s]
-    (str "'" (string/replace s #"'" "\\'") "'"))
+    (str "'" (soql-string-escape s) "'"))
   clojure.lang.IPersistentSet
   (soql-value [xs]
     (str "(" (string/join "," (map soql-value xs)) ")"))
