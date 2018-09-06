@@ -1,3 +1,9 @@
+## 0.9.0 (2018-07-23)
+
+* Add `take-action!` implementation to memory client 
+* Update spec for `build-memory-client`
+* See [commits](https://github.com/SparkFund/sails-forth/compare/0.8.1...0.9.0)
+
 ## 0.8.1
 
 * Introduce sails-forth.datomic ns with assert-query fn
