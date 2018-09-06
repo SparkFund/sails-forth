@@ -1,3 +1,7 @@
+## 0.9.1 (2018-09-06)
+
+* Fix string escaping when building queries in `sails-forth.query`
+
 ## 0.9.0 (2018-07-23)
 
 * Add `take-action!` implementation to memory client 
