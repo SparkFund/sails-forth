@@ -1,4 +1,5 @@
-(ns sails-forth.graphql)
+(ns sails-forth.graphql
+  (:require [sails-forth.client :as client]))
 
 (def default-custom-scalars
   {:Date {:parse (fn parse-date [s]
@@ -34,7 +35,8 @@
 
 (defn add-field
   [schema object field]
-  (let [{:keys [deprecatedAndHidden name label inlineHelpText referenceTo type]} field
+  (let [{:keys [queryable]} object
+        {:keys [deprecatedAndHidden name label idLookup inlineHelpText referenceTo type]} field
         description (or inlineHelpText label)
         picklist? (case type "multipicklist" true "picklist" true false)
         picklist-type (when picklist? (picklist-enum-type object field))
@@ -66,7 +68,12 @@
                         :fields (convert-name name)]]
     (cond-> (assoc-in schema gql-field-path gql-field)
       picklist?
-      (assoc-in [:enums picklist-type] (build-picklist-enum field)))))
+      (assoc-in [:enums picklist-type] (build-picklist-enum field))
+      (and queryable idLookup)
+      (assoc-in [:queries (convert-name (str (get object :name) "_by_" name))]
+                {:type (convert-name (get object :name))
+                 :args {(convert-name name) {:type (list 'non-null gql-type)}}
+                 :resolve (keyword (str "query." (get object :name)) (str "by_" name))}))))
 
 (defn add-object
   [schema object]
@@ -82,3 +89,10 @@
   (reduce add-object
           {:scalars default-custom-scalars}
           objects))
+
+(defn fetch-schema
+  [client]
+  (reduce (fn [schema object]
+            (add-object schema (client/describe! client (get object :name))))
+          {:scalars default-custom-scalars}
+          (client/objects! client)))
