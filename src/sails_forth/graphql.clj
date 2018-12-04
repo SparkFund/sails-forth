@@ -37,7 +37,7 @@
   (let [{:keys [deprecatedAndHidden name label inlineHelpText referenceTo type]} field
         description (or inlineHelpText label)
         picklist? (case type "multipicklist" true "picklist" true false)
-        picklist-type (when (picklist? (picklist-enum-type object field)))
+        picklist-type (when picklist? (picklist-enum-type object field))
         gql-type (case type
                    "address" 'String ; TODO
                    "boolean" 'Boolean
@@ -66,7 +66,7 @@
                         :fields (convert-name name)]]
     (cond-> (assoc-in schema gql-field-path gql-field)
       picklist?
-      (assoc-in schema [:enums picklist-type] (build-picklist-enum field)))))
+      (assoc-in [:enums picklist-type] (build-picklist-enum field)))))
 
 (defn add-object
   [schema object]
