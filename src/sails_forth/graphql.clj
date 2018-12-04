@@ -71,9 +71,12 @@
       (assoc-in [:enums picklist-type] (build-picklist-enum field))
       (and queryable idLookup)
       (assoc-in [:queries (convert-name (str (get object :name) "_by_" name))]
-                {:type (convert-name (get object :name))
-                 :args {(convert-name name) {:type (list 'non-null gql-type)}}
-                 :resolve (keyword (str "query." (get object :name)) (str "by_" name))}))))
+                (with-meta
+                  {:type (convert-name (get object :name))
+                   :args {(convert-name name) {:type (list 'non-null gql-type)}}
+                   :resolve (keyword (str "query." (get object :name)) (str "by_" name))}
+                  {::object object
+                   ::field field})))))
 
 (defn add-object
   [schema object]
@@ -89,6 +92,21 @@
   (reduce add-object
           {:scalars default-custom-scalars}
           objects))
+
+(defn build-query-resolvers
+  [schema]
+  (into {}
+        (keep (fn [query]
+                (let [{:keys [resolve]} query
+                      {::keys [object field]} (meta query)]
+                  (when (and resolve (seq object) (seq field))
+                    [resolve
+                     (fn [context args value]
+                       (let [{::keys [client]} context
+                             id (get args (convert-name (get field :name)))]
+                         ;; TODO build the soql if we can find the query graph?
+                         ))]))))
+        (vals (get schema :queries))))
 
 (defn fetch-schema
   [client]
