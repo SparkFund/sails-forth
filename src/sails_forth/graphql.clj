@@ -43,7 +43,7 @@
         gql-type (case type
                    "address" 'String ; TODO
                    "boolean" 'Boolean
-                   "currency" :Money
+                   "currency" :Money ; TODO needs query resolver?
                    "date" :Date
                    "datetime" :DateTime
                    "double" 'Float
@@ -74,7 +74,13 @@
                 (with-meta
                   {:type (convert-name (get object :name))
                    :args {(convert-name name) {:type (list 'non-null gql-type)}}
-                   :resolve (keyword (str "query." (get object :name)) (str "by_" name))}
+                   :resolve
+                   (fn [context args value]
+                     (let [{::keys [client]} context
+                           id (get args (convert-name (get field :name)))]
+                       #_(clojure.pprint/pprint )
+                       ;; com.walmartlabs.lacinia.executor/selections-tree
+                       ))}
                   {::object object
                    ::field field})))))
 
@@ -92,21 +98,6 @@
   (reduce add-object
           {:scalars default-custom-scalars}
           objects))
-
-(defn build-query-resolvers
-  [schema]
-  (into {}
-        (keep (fn [query]
-                (let [{:keys [resolve]} query
-                      {::keys [object field]} (meta query)]
-                  (when (and resolve (seq object) (seq field))
-                    [resolve
-                     (fn [context args value]
-                       (let [{::keys [client]} context
-                             id (get args (convert-name (get field :name)))]
-                         ;; TODO build the soql if we can find the query graph?
-                         ))]))))
-        (vals (get schema :queries))))
 
 (defn fetch-schema
   [client]
