@@ -13,3 +13,4 @@ test/config.edn
 *.swp
 *.tmp
 .nrepl-history
+.cpcache
