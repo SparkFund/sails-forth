@@ -1,16 +1,22 @@
 (ns sails-forth.graphql
-  (:require [sails-forth.client :as client]))
+  (:require [clojure.spec.alpha :as s]
+            [com.walmartlabs.lacinia.executor :as executor]
+            [com.walmartlabs.lacinia.schema :as schema]))
 
+;; TODO these become simple fns in 0.31
 (def default-custom-scalars
-  {:Date {:parse (fn parse-date [s]
-                   (java.time.LocalDate/parse s))
-          :serialize str}
-   :DateTime {:parse (fn parse-datetime [s]
-                       (java.time.ZonedDateTime/parse s))
-              :serialize str}
-   :Money {:parse (fn parse-money [s]
-                    (.setScale ^BigDecimal (bigdec s) 2))
-           :serialize str}})
+  {:Date {:parse (schema/as-conformer (fn parse-date [s]
+                                        (java.time.LocalDate/parse s)))
+          :serialize (schema/as-conformer str)}
+   :DateTime {:parse (schema/as-conformer (fn parse-datetime [s]
+                                            (java.time.ZonedDateTime/parse s)))
+              :serialize (schema/as-conformer str)}
+   :Money {:parse (schema/as-conformer (fn parse-money [s]
+                                         (.setScale ^BigDecimal (bigdec s) 2)))
+           :serialize (schema/as-conformer str)}
+   :Time {:parse (schema/as-conformer (fn parse-time [s]
+                                        (java.time.LocalTime/parse s)))
+          :serialize (schema/as-conformer str)}})
 
 (defn convert-name
   [s]
@@ -38,11 +44,27 @@
   (let [{:keys [queryable]} object
         {:keys [deprecatedAndHidden name label idLookup inlineHelpText referenceTo type]} field
         description (or inlineHelpText label)
-        picklist? (case type "multipicklist" true "picklist" true false)
-        picklist-type (when picklist? (picklist-enum-type object field))
+        enum-type? (case type
+                     "combobox" true
+                     "multipicklist" true
+                     "picklist" true
+                     false)
+        enum-values? (when enum-type?
+                       (let [values (map :value (get field :picklistValues))]
+                         (and (seq values)
+                              (= (distinct values) values)
+                              (every? (fn [value]
+                                        (s/valid? ::schema/enum-value value))
+                                      values))))
+        enum-type (when (and enum-type? enum-values?)
+                    (picklist-enum-type object field))
         gql-type (case type
                    "address" 'String ; TODO
+                   "anyType" nil ; TODO wtf could we even do here? skip it for now.
+                   "base64" 'String
                    "boolean" 'Boolean
+                   "combobox" (or enum-type 'String)
+                   "complexvalue" nil ; TODO wtf again
                    "currency" :Money ; TODO needs query resolver?
                    "date" :Date
                    "datetime" :DateTime
@@ -51,38 +73,37 @@
                    "encryptedstring" 'String
                    "id" 'ID
                    "int" 'Int
-                   "multipicklist" (list 'list picklist-type)
+                   "multipicklist" (list 'list (or enum-type 'String))
                    "percent" 'Float
                    "phone" 'String ; TODO
-                   "picklist" (picklist-enum-type object field)
+                   "picklist" (or enum-type 'String)
                    "reference" (convert-name (first referenceTo))
                    "string" 'String
                    "textarea" 'String
-                   "url" 'String)
-        gql-field (cond-> {:type gql-type}
-                    description
-                    (assoc :description description)
-                    deprecatedAndHidden
-                    (assoc :deprecated true))
-        gql-field-path [:objects (convert-name (get object :name))
-                        :fields (convert-name name)]]
-    (cond-> (assoc-in schema gql-field-path gql-field)
-      picklist?
-      (assoc-in [:enums picklist-type] (build-picklist-enum field))
-      (and queryable idLookup)
+                   "time" :Time
+                   "url" 'String
+                   (throw (ex-info "invalid type" {:field field})))]
+    (cond-> schema
+      gql-type
+      (assoc-in [:objects (convert-name (get object :name))
+                 :fields (convert-name name)]
+                (cond-> {:type gql-type}
+                  description
+                  (assoc :description description)
+                  deprecatedAndHidden
+                  (assoc :deprecated true)))
+      enum-type
+      (assoc-in [:enums enum-type] (build-picklist-enum field))
+      (and gql-type queryable idLookup)
       (assoc-in [:queries (convert-name (str (get object :name) "_by_" name))]
-                (with-meta
-                  {:type (convert-name (get object :name))
-                   :args {(convert-name name) {:type (list 'non-null gql-type)}}
-                   :resolve
-                   (fn [context args value]
-                     (let [{::keys [client]} context
-                           id (get args (convert-name (get field :name)))]
-                       #_(clojure.pprint/pprint )
-                       ;; com.walmartlabs.lacinia.executor/selections-tree
-                       ))}
-                  {::object object
-                   ::field field})))))
+                {:type (convert-name (get object :name))
+                 :args {(convert-name name) {:type (list 'non-null gql-type)}}
+                 :resolve
+                 (fn [context args value]
+                   (let [{::keys [client]} context
+                         id (get args (convert-name (get field :name)))]
+                     (clojure.pprint/pprint (executor/selections-tree context))
+                     (throw (ex-info "um" {}))))}))))
 
 (defn add-object
   [schema object]
@@ -94,14 +115,7 @@
             fields)))
 
 (defn build-schema
-  [objects]
+  [sf-schema]
   (reduce add-object
           {:scalars default-custom-scalars}
-          objects))
-
-(defn fetch-schema
-  [client]
-  (reduce (fn [schema object]
-            (add-object schema (client/describe! client (get object :name))))
-          {:scalars default-custom-scalars}
-          (client/objects! client)))
+          (vals sf-schema)))
