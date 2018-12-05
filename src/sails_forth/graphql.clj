@@ -1,7 +1,9 @@
 (ns sails-forth.graphql
   (:require [clojure.spec.alpha :as s]
+            [clojure.string :as string]
             [com.walmartlabs.lacinia.executor :as executor]
-            [com.walmartlabs.lacinia.schema :as schema]))
+            [com.walmartlabs.lacinia.schema :as schema]
+            [sails-forth.client :as client]))
 
 ;; TODO these become simple fns in 0.31
 (def default-custom-scalars
@@ -39,8 +41,36 @@
                               (assoc :deprecated true)))))
                    picklistValues)}))
 
+(defn build-soql-select-field
+  [sf-schema object selection]
+  ;; {:User/Id nil :User/UserRoleId}
+  (let [[k v] selection]
+    (if (nil? v)
+      (name k)
+      (throw (ex-info "Cannot handle nested fields yet" {:selection selection})))))
+
+(defn build-query-by-id-resolver
+  [sf-schema object field]
+  (fn query-by-id-resolver [context args value]
+    (let [{::keys [client]} context
+          id (get args (convert-name (get field :name)))
+          fields (into []
+                       (map (fn [selection]
+                              (build-soql-select-field sf-schema object selection)))
+                       (executor/selections-tree context))
+          soql (format "SELECT %s FROM %s WHERE %s = %s"
+                       (string/join ", " fields)
+                       (get object :name)
+                       (get field :name)
+                       ;; TODO SEVERE escape the id correctly
+                       (str "'" id "'"))
+          ;; TODO distinguish between id failures and other failures?
+          results (client/query! client soql)]
+      (when (seq results)
+        (first results)))))
+
 (defn add-field
-  [schema object field]
+  [schema sf-schema object field]
   (let [{:keys [queryable]} object
         {:keys [deprecatedAndHidden name label idLookup inlineHelpText referenceTo type]} field
         description (or inlineHelpText label)
@@ -99,23 +129,19 @@
                 {:type (convert-name (get object :name))
                  :args {(convert-name name) {:type (list 'non-null gql-type)}}
                  :resolve
-                 (fn [context args value]
-                   (let [{::keys [client]} context
-                         id (get args (convert-name (get field :name)))]
-                     (clojure.pprint/pprint (executor/selections-tree context))
-                     (throw (ex-info "um" {}))))}))))
+                 (build-query-by-id-resolver sf-schema object field)}))))
 
 (defn add-object
-  [schema object]
+  [schema sf-schema object]
   (let [{:keys [name fields custom label]} object
         gql-object-path [:objects (convert-name name)]]
     (reduce (fn [schema field]
-              (add-field schema object field))
+              (add-field schema sf-schema object field))
             (assoc-in schema (conj gql-object-path :description) label)
             fields)))
 
 (defn build-schema
   [sf-schema]
-  (reduce add-object
+  (reduce (fn [schema object] (add-object schema sf-schema object))
           {:scalars default-custom-scalars}
           (vals sf-schema)))
