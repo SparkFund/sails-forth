@@ -1,9 +1,10 @@
-(def version "0.9.1")
+(def version "0.10.0-SNAPSHOT")
 
 (task-options!
   pom {:project 'sparkfund/sails-forth
        :version version
-       :description "A Salesforce library"})
+       :description "A Salesforce library"}
+  repl {:init-ns 'sails-forth.repl})
 
 (set-env!
  :resource-paths #{"src"}
@@ -17,6 +18,7 @@
    [clj-time "0.11.0"]
    [com.datomic/datomic-free "0.9.5561.62" :scope "test"]
    [com.github.jsqlparser/jsqlparser "0.9.5"]
+   [com.walmartlabs/lacinia "0.31.0-SNAPSHOT-1"]
    [org.clojure/clojure "1.9.0" :scope "provided"]
    [org.clojure/test.check "0.9.0" :scope "test"]
    [sparkfund/boot-spec-coverage "0.4.0" :scope "test"]]
