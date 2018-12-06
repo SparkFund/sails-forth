@@ -41,23 +41,31 @@
                               (assoc :deprecated true)))))
                    picklistValues)}))
 
-(defn build-soql-select-field
-  [sf-schema object selection]
-  ;; {:User/Id nil :User/UserRoleId}
-  (let [[k v] selection]
-    (if (nil? v)
-      (name k)
-      (throw (ex-info "Cannot handle nested fields yet" {:selection selection})))))
+(defn resolve-soql-fields
+  [sf-schema oname selection]
+  (reduce-kv (fn [accum k v]
+               (let [local-name (name k)]
+                 (if (nil? v)
+                   (conj accum local-name)
+                   (let [selection (get v :selections)
+                         object (first (filter (fn [field]
+                                                 (= local-name (get field :name)))
+                                               (get-in sf-schema [oname :fields])))
+                         path (str (get object :relationshipName) ".")]
+                     (into accum
+                           (map (fn [field]
+                                  (str path field)))
+                           (resolve-soql-fields sf-schema local-name selection))))))
+             #{}
+             selection))
 
 (defn build-query-by-id-resolver
   [sf-schema object field]
   (fn query-by-id-resolver [context args value]
     (let [{::keys [client]} context
           id (get args (convert-name (get field :name)))
-          fields (into []
-                       (map (fn [selection]
-                              (build-soql-select-field sf-schema object selection)))
-                       (executor/selections-tree context))
+          selection (executor/selections-tree context)
+          fields (resolve-soql-fields sf-schema (get object :name) selection)
           soql (format "SELECT %s FROM %s WHERE %s = %s"
                        (string/join ", " fields)
                        (get object :name)
@@ -66,7 +74,9 @@
                        (str "'" id "'"))
           ;; TODO distinguish between id failures and other failures?
           results (client/query! client soql)]
+      (prn "soql" soql)
       (when (seq results)
+        (prn (first results))
         (first results)))))
 
 (defn add-field
