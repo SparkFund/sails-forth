@@ -119,12 +119,16 @@
                    "percent" 'Float
                    "phone" 'String ; TODO
                    "picklist" (or enum-type 'String)
-                   "reference" (convert-name (first referenceTo))
+                   "reference" (do
+                                 (when (next referenceTo)
+                                   (throw (ex-info "Cannot handle union types"
+                                                   {:object object :field field})))
+                                 (convert-name (first referenceTo)))
                    "string" 'String
                    "textarea" 'String
                    "time" :Time
                    "url" 'String
-                   (throw (ex-info "invalid type" {:field field})))]
+                   (throw (ex-info "invalid type" {:object object :field field})))]
     (cond-> schema
       gql-type
       (assoc-in [:objects (convert-name (get object :name))
