@@ -119,10 +119,8 @@
                    "percent" 'Float
                    "phone" 'String ; TODO
                    "picklist" (or enum-type 'String)
-                   "reference" (do
-                                 (when (next referenceTo)
-                                   (throw (ex-info "Cannot handle union types"
-                                                   {:object object :field field})))
+                   ;; TODO these could be union types
+                   "reference" (when-not (next referenceTo)
                                  (convert-name (first referenceTo)))
                    "string" 'String
                    "textarea" 'String
