@@ -74,21 +74,23 @@
                        (str "'" id "'"))
           ;; TODO distinguish between id failures and other failures?
           results (client/query! client soql)]
-      (prn "soql" soql)
       (when (seq results)
-        (prn (first results))
         (first results)))))
 
 (defn add-field
   [schema sf-schema object field]
   (let [{:keys [queryable]} object
-        {:keys [deprecatedAndHidden name label idLookup inlineHelpText referenceTo type]} field
+        {:keys [deprecatedAndHidden name label idLookup inlineHelpText relationshipName referenceTo type]} field
         description (or inlineHelpText label)
         enum-type? (case type
                      "combobox" true
                      "multipicklist" true
                      "picklist" true
                      false)
+        ;; graphql enum values must be valid graphql identifiers, which is not
+        ;; at all true of salesforce picklist values. Still, there's probably
+        ;; value for schema exploration to make enums when we can, especially
+        ;; since this schema is not intended to be a stable, reliable contract
         enum-values? (when enum-type?
                        (let [values (map :value (get field :picklistValues))]
                          (and (seq values)
@@ -131,7 +133,10 @@
                   description
                   (assoc :description description)
                   deprecatedAndHidden
-                  (assoc :deprecated true)))
+                  (assoc :deprecated true)
+                  (= "reference" type)
+                  (assoc :resolve (fn resolve-reference-field [context args value]
+                                    (get value (keyword relationshipName))))))
       enum-type
       (assoc-in [:enums enum-type] (build-picklist-enum field))
       (and gql-type queryable idLookup)
