@@ -1,3 +1,7 @@
+## 0.10.0 (2019-04-08)
+
+* Update to Clojure 10
+
 ## 0.9.1 (2018-09-06)
 
 * Fix string escaping when building queries in `sails-forth.query`
