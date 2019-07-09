@@ -173,14 +173,24 @@
   (eval2 [this schema object]
     "Evalutes this against the schema and object"))
 
+(defn parse-literal
+  [s]
+  ;; Absolutely wild that the parser throws away the type info
+  ;; so we get to duplicate the cases about which we care here
+  (condp re-matches s
+    #"true" true
+    #"false" false
+    #"null" nil
+    #"\d\d\d\d-\d\d-\d\d" (org.joda.time.LocalDate. s)
+    #"\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|(\+|-)?\d\d:\d\d)?" (org.joda.time.DateTime. s)
+    #"(\+|-)?\d+" (Long/parseLong s)
+    #"(\+|-)?\d+(\.\d+)?" (Double/parseDouble s)
+    #"'(.*)'" :>> (fn [[_ s]] s)))
+
 (extend-protocol Evaluable
   org.mule.tools.soql.query.data.Literal
   (eval2 [literal _ _]
-    (let [s (.toString literal)]
-      (condp re-matches s
-        #"\d\d\d\d-\d\d-\d\d" (org.joda.time.LocalDate. s)
-        #"\d+" (Long/parseLong s)
-        #"'(.*)'" :>> (fn [[_ s]] s))))
+    (parse-literal (.toString literal)))
   org.mule.tools.soql.query.data.Field
   (eval2 [field schema object]
     (let [object-path (into [] (map keyword) (.getObjectPrefixNames field))
