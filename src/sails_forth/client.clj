@@ -2,6 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [sails-forth.http :as http]
             [sails-forth.memory :as memory]
+            [sails-forth.memory2 :as memory2]
             [sails-forth.spec :as spec]
             [sails-forth.clojurify :as clj]))
 
@@ -232,6 +233,38 @@
          cache)
        (take-action! [_ action inputs]
          (memory/take-action! client take-action-map action inputs))))))
+
+(defn build-memory2-client
+  ([schema]
+   (build-memory2-client schema {}))
+  ([schema take-action-map]
+   (let [client (memory2/create-state! schema)
+         cache (build-atomic-cache)]
+     (reify Client
+       (create! [_ type attrs]
+         (memory2/create! client type attrs))
+       (delete! [_ type id]
+         (memory2/delete! client type id))
+       (update! [_ type id attrs]
+         (memory2/update! client type id attrs))
+       (list! [_ type]
+         (memory2/list! client type))
+       (describe! [_ type]
+         (memory2/describe! client type))
+       (objects! [_]
+         (memory2/objects! client))
+       (query! [_ query]
+         (memory2/query! client query))
+       (count! [_ query]
+         (memory2/count! client query))
+       (limits! [_]
+         (memory2/limits! client))
+       (import! [_ type records]
+         (future (mapv (partial create! type) records)))
+       (cache [_]
+         cache)
+       (take-action! [_ action inputs]
+         (memory2/take-action! client take-action-map action inputs))))))
 
 (defn client?
   [x]
