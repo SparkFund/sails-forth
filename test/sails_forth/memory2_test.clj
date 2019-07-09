@@ -47,8 +47,12 @@
       (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}
                :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
              (sf/query! client (str "select Amount__c,CreatedBy.Name from Payment__c"))))
-      (is (= 1 (sf/count! client "select Amount__c from Payment__c"))))
-    (testing "dates"
+      (is (= 1 (sf/count! client "select Amount__c from Payment__c")))
+      (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}
+               :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
+             (sf/query! client (str "select Amount__c, CreatedBy.Name from Payment__c "
+                                    "where CreatedBy.Name = 'Donald'")))))
+    #_(testing "dates"
       (let [id (sf/create! client "Payment__c" {"Actual_Date__c" "2016-01-01"})])
       (is (= (sq/query client {:find [:payment :actual-date]})
              [{:payment {}} ; TODO is this right? who knows

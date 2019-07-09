@@ -7,7 +7,7 @@
   (:import [java.util UUID]
            [org.mule.tools.soql SOQLParserHelper]
            [org.joda.time DateTime LocalDate])
-  (:refer-clojure :exclude [eval list update]))
+  (:refer-clojure :exclude [list update]))
 
 ;; TODO could narrow this down a bit lol
 (s/def ::schema
@@ -165,25 +165,49 @@
   (objects @astate))
 
 (defprotocol Filter
-  (allows? [this object]
+  (allows? [this schema object]
     "Returns true if the object is allowed by this filter"))
 
 (defprotocol Evaluable
   ;; This is used by the filter implementations to evaluate their operands
-  (eval [this context]
-    "Evalutes this in the given context"))
+  (eval2 [this schema object]
+    "Evalutes this against the schema and object"))
+
+(extend-protocol Evaluable
+  org.mule.tools.soql.query.data.Literal
+  (eval2 [literal _ _]
+    (let [s (.toString literal)]
+      (condp re-matches s
+        #"\d\d\d\d-\d\d-\d\d" (org.joda.time.LocalDate. s)
+        #"\d+" (Long/parseLong s)
+        #"'(.*)'" :>> (fn [[_ s]] s))))
+  org.mule.tools.soql.query.data.Field
+  (eval2 [field schema object]
+    (let [object-path (into [] (map keyword) (.getObjectPrefixNames field))
+          object (cond-> object
+                   (seq object-path)
+                   (get-in object-path))
+          type (get-in object [:attributes :type])
+          field-name (.getFieldName field)
+          sf-field (some (fn [sf-field]
+                           (when (= field-name
+                                    (get sf-field :name))
+                             sf-field))
+                         (get-in schema [type :fields]))
+          value (get object (keyword field-name))]
+      (clj/default-coerce-from-salesforce sf-field value))))
 
 (extend-protocol Filter
   org.mule.tools.soql.query.condition.operator.AndOperator
-  (allows? [operator object]
-    (and (allows? (.getLeftCondition operator) object)
-         (allows? (.getRightCondition operator) object)))
+  (allows? [operator schema object]
+    (and (allows? (.getLeftCondition operator) schema object)
+         (allows? (.getRightCondition operator) schema object)))
   org.mule.tools.soql.query.condition.operator.OrOperator
-  (allows? [operator object]
-    (or (allows? (.getLeftCondition operator) object)
-        (allows? (.getRightCondition operator) object)))
+  (allows? [operator schema object]
+    (or (allows? (.getLeftCondition operator) schema object)
+        (allows? (.getRightCondition operator) schema object)))
   org.mule.tools.soql.query.condition.FieldBasedCondition
-  (allows? [condition object]
+  (allows? [condition schema object]
     (let [pred (case (.toString (.getOperator condition))
                  ">" pos?
                  ">=" (complement neg?)
@@ -199,26 +223,13 @@
       ;; coerce them to comparable values, so: I suppose we thread in the object type?
       ;;
       ;; the from clause gives us the root object, and I guess we can eval on that?
-      (prn "condition" (eval (.getConditionField condition) object))
-      (prn "literal" (eval (.getLiteral condition) object))
-      (pred (compare (eval (.getConditionField condition) object)
-                     (eval (.getLiteral condition) object)))))
+      (prn "condition" (eval2 (.getConditionField condition) schema object))
+      (prn "literal" (eval2 (.getLiteral condition) schema object))
+      (pred (compare (eval2 (.getConditionField condition) schema object)
+                     (eval2 (.getLiteral condition) schema object)))))
   nil
-  (allows? [_ _]
+  (allows? [_ _ _]
     true))
-
-(extend-protocol Evaluable
-  org.mule.tools.soql.query.data.Literal
-  (eval [literal context]
-    (let [s (.toString literal)]
-      (condp re-matches s
-        #"\d\d\d\d-\d\d-\d\d" (org.joda.time.LocalDate. s)
-        #"\d+" (Long/parseLong s))))
-  org.mule.tools.soql.query.data.Field
-  (eval [field context]
-    (let [parts (conj (into [] (.getObjectPrefixNames field)) (.getFieldName field))
-          path (mapv keyword parts)]
-      (get-in context path))))
 
 (defn parse-soql
   [soql]
@@ -227,7 +238,7 @@
     {:select (for [spec (.getSelectSpecs form)]
                (conj (into [] (.getObjectPrefixNames spec)) (.getFieldName spec)))
      :from (.toString (.getMainObjectSpec (.getFromClause form)))
-     :where (partial allows? (some-> (.getWhereClause form) (.getCondition)))}))
+     :where (some-> (.getWhereClause form) (.getCondition))}))
 
 (defn project
   [state type object path]
@@ -275,7 +286,7 @@
          (map (fn [object]
                 (reduce deep-merge {}
                         (map (partial project state from object) select))))
-         (filter where)
+         (filter (partial allows? where schema))
          (into []))))
 
 (defn query!
