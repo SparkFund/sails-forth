@@ -175,6 +175,26 @@
   (allows? [expr object]
     (= (render (.getLeftExpression expr) object)
        (render (.getRightExpression expr) object)))
+  net.sf.jsqlparser.expression.operators.relational.GreaterThan
+  (allows? [expr object]
+    (let [comparison (compare (render (.getLeftExpression expr) object)
+                              (render (.getRightExpression expr) object))]
+      (pos? comparison)))
+  net.sf.jsqlparser.expression.operators.relational.GreaterThanEquals
+  (allows? [expr object]
+    (let [comparison (compare (render (.getLeftExpression expr) object)
+                              (render (.getRightExpression expr) object))]
+      (not (neg? comparison))))
+  net.sf.jsqlparser.expression.operators.relational.MinorThan
+  (allows? [expr object]
+    (let [comparison (compare (render (.getLeftExpression expr) object)
+                              (render (.getRightExpression expr) object))]
+      (neg? comparison)))
+  net.sf.jsqlparser.expression.operators.relational.MinorThanEquals
+  (allows? [expr object]
+    (let [comparison (compare (render (.getLeftExpression expr) object)
+                              (render (.getRightExpression expr) object))]
+      (not (pos? comparison))))
   net.sf.jsqlparser.expression.operators.conditional.AndExpression
   (allows? [expr object]
     (and (allows? (.getLeftExpression expr) object)
