@@ -165,10 +165,13 @@
   (objects @astate))
 
 (defprotocol Filter
-  (allows? [_ object]))
+  (allows? [this object]
+    "Returns true if the object is allowed by this filter"))
 
 (defprotocol Renderer
-  (render [_ context]))
+  ;; This is used by the filter implementations to evaluate their operands
+  (render [this context]
+    "Renders or evalutes this in the given context"))
 
 (extend-protocol Filter
   net.sf.jsqlparser.expression.operators.relational.EqualsTo
@@ -301,3 +304,11 @@
     (f astate inputs)
     (throw (ex-info "action failed" {:cause (str action " not implemented")
                                      :take-action-map take-action-map}))))
+
+(defn find-methods
+  [o]
+  (sort-by (juxt :name :parameter-types)
+           (into []
+                 (comp (filter (fn [m] (contains? (get m :flags) :public)))
+                       (remove (fn [m] (= 'java.lang.Object (get m :declaring-class)))))
+                 (get (clojure.reflect/reflect o :ancestors true) :members))))
