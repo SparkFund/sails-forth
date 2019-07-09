@@ -52,16 +52,20 @@
                :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
              (sf/query! client (str "select Amount__c, CreatedBy.Name from Payment__c "
                                     "where CreatedBy.Name = 'Donald'")))))
-    #_(testing "dates"
-      (let [id (sf/create! client "Payment__c" {"Actual_Date__c" "2016-01-01"})])
+    (testing "dates"
+      (sf/create! client "Payment__c" {"Actual_Date__c" "2016-01-01"})
       (is (= (sq/query client {:find [:payment :actual-date]})
-             [{:payment {}} ; TODO is this right? who knows
+             [{:payment {}}
               {:payment {:actual-date (org.joda.time.LocalDate. "2016-01-01")}}]))
-      (is (= [:foo]
+      (is (= [{:Actual_Date__c "2016-01-01"
+               :attributes {:type "Payment__c"}}]
              (sf/query! client (str "select Amount__c, Actual_Date__c from Payment__c "
-                                    "where Actual_Date__c = 2016-01-01")))))
-    #_(testing "limits"
+                                    "where Actual_Date__c = 2016-01-01"))))
+      (is (not (seq
+                (sf/query! client (str "select Amount__c, Actual_Date__c from Payment__c "
+                                       "where Actual_Date__c = 2016-01-02"))))))
+    (testing "limits"
       (is (= {} (sf/limits! client))))
-    #_(testing "take-action!"
+    (testing "take-action!"
       (is (= "some input" (sf/take-action! client "custom/apex/TestEndpoint" "some input")))
       (is (thrown? clojure.lang.ExceptionInfo (sf/take-action! client "custom/apex/BadEndpoint" "other input"))))))

@@ -195,7 +195,8 @@
                              sf-field))
                          (get-in schema [type :fields]))
           value (get object (keyword field-name))]
-      (clj/default-coerce-from-salesforce sf-field value))))
+      (when value
+        (clj/default-coerce-from-salesforce sf-field value)))))
 
 (extend-protocol Filter
   org.mule.tools.soql.query.condition.operator.AndOperator
@@ -216,15 +217,6 @@
                  "=" zero?
                  "!=" (complement zero?)
                  "<>" (throw (ex-info "Not implemented" {})))]
-      (prn "about to compare" condition object)
-      ;; TODO in the date case, the condition is a string and the literal is a date
-      ;; we want to keep the dates stored in the "database" as strings since that's
-      ;; the way salesforce presents them to us, but here we need to be able to
-      ;; coerce them to comparable values, so: I suppose we thread in the object type?
-      ;;
-      ;; the from clause gives us the root object, and I guess we can eval on that?
-      (prn "condition" (eval2 (.getConditionField condition) schema object))
-      (prn "literal" (eval2 (.getLiteral condition) schema object))
       (pred (compare (eval2 (.getConditionField condition) schema object)
                      (eval2 (.getLiteral condition) schema object)))))
   nil
