@@ -304,11 +304,3 @@
     (f astate inputs)
     (throw (ex-info "action failed" {:cause (str action " not implemented")
                                      :take-action-map take-action-map}))))
-
-(defn find-methods
-  [o]
-  (sort-by (juxt :name :parameter-types)
-           (into []
-                 (comp (filter (fn [m] (contains? (get m :flags) :public)))
-                       (remove (fn [m] (= 'java.lang.Object (get m :declaring-class)))))
-                 (get (clojure.reflect/reflect o :ancestors true) :members))))
