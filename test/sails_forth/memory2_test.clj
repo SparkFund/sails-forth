@@ -9,7 +9,7 @@
 
 (deftest test-memory-client
   (let [schema (edn/read-string (slurp "test/schema.edn"))
-        client (sf/build-memory2-client schema {"custom/apex/TestEndpoint" (fn [c inputs] inputs)})]
+        client (sf/build-memory-client schema {"custom/apex/TestEndpoint" (fn [c inputs] inputs)})]
     (testing "schema"
       (is (= #{"Payment__c" "User"}
              (set (map :name (:sobjects (sf/objects! client))))))

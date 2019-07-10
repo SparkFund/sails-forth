@@ -1,4 +1,4 @@
-(def version "0.10.1-SNAPSHOT")
+(def version "0.11.0-SNAPSHOT")
 
 (task-options!
   pom {:project 'sparkfund/sails-forth
@@ -16,7 +16,6 @@
    [clj-http "2.0.0"]
    [clj-time "0.11.0"]
    [com.datomic/datomic-free "0.9.5561.62" :scope "test"]
-   [com.github.jsqlparser/jsqlparser "0.9.5"]
    [org.clojure/clojure "1.10.0" :scope "provided"]
    [org.clojure/test.check "0.9.0" :scope "test"]
    [org.mule.tools/salesforce-soql-parser "2.0"]
