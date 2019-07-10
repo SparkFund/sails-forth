@@ -217,6 +217,12 @@
   (allows? [operator schema object]
     (or (allows? (.getLeftCondition operator) schema object)
         (allows? (.getRightCondition operator) schema object)))
+  org.mule.tools.soql.query.condition.operator.NotOperator
+  (allows? [operator schema object]
+    (not (allows? (.getCondition operator) schema object)))
+  org.mule.tools.soql.query.condition.operator.Parenthesis
+  (allows? [operator schema object]
+    (allows? (.getCondition operator) schema object))
   org.mule.tools.soql.query.condition.FieldBasedCondition
   (allows? [condition schema object]
     (let [pred (case (.toString (.getOperator condition))
