@@ -1,4 +1,4 @@
-(def version "0.10.0")
+(def version "0.11.0")
 
 (task-options!
   pom {:project 'sparkfund/sails-forth
@@ -16,12 +16,14 @@
    [clj-http "2.0.0"]
    [clj-time "0.11.0"]
    [com.datomic/datomic-free "0.9.5561.62" :scope "test"]
-   [com.github.jsqlparser/jsqlparser "0.9.5"]
    [org.clojure/clojure "1.10.0" :scope "provided"]
    [org.clojure/test.check "0.9.0" :scope "test"]
+   [org.mule.tools/salesforce-soql-parser "2.0"]
    [sparkfund/boot-spec-coverage "0.4.0" :scope "test"]]
  :repositories
- #(conj % ["sparkfund" {:url "s3p://sparkfund-maven/releases/"}])
+ #(conj %
+        ["sparkfund" {:url "s3p://sparkfund-maven/releases/"}]
+        ["mulesoft" {:url "https://repository.mulesoft.org/releases/"}])
  :wagons '[[sparkfund/aws-cli-wagon "1.0.4"]])
 
 (require '[adzerk.boot-jar2bin :refer :all]

@@ -1,7 +1,7 @@
 (ns sails-forth.client
   (:require [clojure.spec.alpha :as s]
             [sails-forth.http :as http]
-            [sails-forth.memory :as memory]
+            [sails-forth.memory2 :as memory2]
             [sails-forth.spec :as spec]
             [sails-forth.clojurify :as clj]))
 
@@ -197,7 +197,7 @@
                                    :ret any?))))
 
 (s/fdef build-memory-client
-  :args (s/cat :schema ::memory/schema
+  :args (s/cat :schema ::memory2/schema
                :take-action-map ::take-action-map)
   :ret ::client)
 
@@ -205,33 +205,33 @@
   ([schema]
    (build-memory-client schema {}))
   ([schema take-action-map]
-   (let [client (memory/create-state! schema)
+   (let [client (memory2/create-state! schema)
          cache (build-atomic-cache)]
      (reify Client
        (create! [_ type attrs]
-         (memory/create! client type attrs))
+         (memory2/create! client type attrs))
        (delete! [_ type id]
-         (memory/delete! client type id))
+         (memory2/delete! client type id))
        (update! [_ type id attrs]
-         (memory/update! client type id attrs))
+         (memory2/update! client type id attrs))
        (list! [_ type]
-         (memory/list! client type))
+         (memory2/list! client type))
        (describe! [_ type]
-         (memory/describe! client type))
+         (memory2/describe! client type))
        (objects! [_]
-         (memory/objects! client))
+         (memory2/objects! client))
        (query! [_ query]
-         (memory/query! client query))
+         (memory2/query! client query))
        (count! [_ query]
-         (memory/count! client query))
+         (memory2/count! client query))
        (limits! [_]
-         (memory/limits! client))
+         (memory2/limits! client))
        (import! [_ type records]
          (future (mapv (partial create! type) records)))
        (cache [_]
          cache)
        (take-action! [_ action inputs]
-         (memory/take-action! client take-action-map action inputs))))))
+         (memory2/take-action! client take-action-map action inputs))))))
 
 (defn client?
   [x]
@@ -376,7 +376,7 @@
 (s/fdef schema
   :args (s/cat :client ::client
                :types (s/coll-of ::clj/attr))
-  :ret ::memory/schema)
+  :ret ::memory2/schema)
 
 (defn ^:spark/no-boot-spec-coverage schema
   [client types]

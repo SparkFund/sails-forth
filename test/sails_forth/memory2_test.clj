@@ -1,9 +1,9 @@
-(ns sails-forth.memory-test
+(ns sails-forth.memory2-test
   (:require [clojure.edn :as edn]
             [clojure.test :refer :all]
             [clojure.spec.test.alpha :as stest]
             [sails-forth.client :as sf]
-            [sails-forth.memory :refer :all]
+            [sails-forth.memory2 :refer :all]
             [sails-forth.query :as sq])
   (:refer-clojure :exclude [update list]))
 
@@ -32,8 +32,16 @@
       (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}}]
              (sf/query! client (str "select Amount__c from Payment__c "
                                     "where Amount__c = 5"))))
-      ;; TODO handle parentheses
-      #_(is (= [{:Amount__c 5 :attributes {:type "Payment__c"}}]
+      (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}}]
+             (sf/query! client (str "select Amount__c from Payment__c "
+                                    "where Amount__c >= 5"))))
+      (is (= []
+             (sf/query! client (str "select Amount__c from Payment__c "
+                                    "where Amount__c >= 6"))))
+      (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}}]
+             (sf/query! client (str "select Amount__c from Payment__c "
+                                    "where not (Amount__c = 6)"))))
+      (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}}]
              (sf/query! client (str "select Amount__c from Payment__c "
                                     "where (Amount__c = 5)"))))
       (is (not (seq (sf/query! client (str "select Amount__c from Payment__c "
@@ -41,12 +49,30 @@
       (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}
                :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
              (sf/query! client (str "select Amount__c,CreatedBy.Name from Payment__c"))))
-      (is (= 1 (sf/count! client "select Amount__c from Payment__c"))))
+      (is (= 1 (sf/count! client "select Amount__c from Payment__c")))
+      (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}
+               :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
+             (sf/query! client (str "select Amount__c, CreatedBy.Name from Payment__c "
+                                    "where CreatedBy.Name = 'Donald'"))))
+      (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}
+               :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
+             (sf/query! client (str "select Amount__c, CreatedBy.Name from Payment__c "
+                                    "where CreatedBy.Name IN ('Donald', 'Claire')"))))
+      (is (= []
+             (sf/query! client (str "select Amount__c, CreatedBy.Name from Payment__c "
+                                    "where CreatedBy.Name NOT IN ('Donald', 'Claire')")))))
     (testing "dates"
-      (let [id (sf/create! client "Payment__c" {"Actual_Date__c" "2016-01-01"})]
-        (is (= (sq/query client {:find [:payment :actual-date]})
-               [{:payment {}} ; TODO is this right? who knows
-                {:payment {:actual-date (org.joda.time.LocalDate. "2016-01-01")}}]))))
+      (sf/create! client "Payment__c" {"Actual_Date__c" "2016-01-01"})
+      (is (= (sq/query client {:find [:payment :actual-date]})
+             [{:payment {}}
+              {:payment {:actual-date (org.joda.time.LocalDate. "2016-01-01")}}]))
+      (is (= [{:Actual_Date__c "2016-01-01"
+               :attributes {:type "Payment__c"}}]
+             (sf/query! client (str "select Amount__c, Actual_Date__c from Payment__c "
+                                    "where Actual_Date__c = 2016-01-01"))))
+      (is (not (seq
+                (sf/query! client (str "select Amount__c, Actual_Date__c from Payment__c "
+                                       "where Actual_Date__c = 2016-01-02"))))))
     (testing "limits"
       (is (= {} (sf/limits! client))))
     (testing "take-action!"

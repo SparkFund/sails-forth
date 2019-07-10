@@ -40,10 +40,16 @@
                       (:relationshipName field)
                       (:name field))]
             (recur (conj refs ref)
-                   fields')))))))
+                   fields'))))))
+  org.joda.time.DateTime
+  (soql-value [dt]
+    (.toString dt))
+  org.joda.time.LocalDate
+  (soql-value [ld]
+    (.toString ld)))
 
 (s/def ::where-operator
-  #{:in := :or})
+  #{:in := :or :> :< :>= :<=})
 
 (s/def ::where-value
   (s/or :string string?

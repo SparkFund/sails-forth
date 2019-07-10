@@ -1,3 +1,7 @@
+## 0.10.1 (2019-07-08)
+
+* Add support for comparison operators in soql in the memory client
+
 ## 0.10.0 (2019-04-08)
 
 * Update to Clojure 10
