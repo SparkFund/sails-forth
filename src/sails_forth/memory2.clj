@@ -229,6 +229,19 @@
                  "<>" (throw (ex-info "Not implemented" {})))]
       (pred (compare (eval2 (.getConditionField condition) schema object)
                      (eval2 (.getLiteral condition) schema object)))))
+  org.mule.tools.soql.query.condition.SetBasedCondition
+  (allows? [condition schema object]
+    (let [values (into #{}
+                       (map (fn [literal]
+                              (eval2 literal schema object)))
+                       (.getValues (.getSet condition)))
+          value (eval2 (.getConditionField condition) schema object)
+          set-contains-value? (contains? values value)]
+      (case (.toString (.getOperator condition))
+        "IN"
+        set-contains-value?
+        "NOT IN"
+        (not set-contains-value?))))
   nil
   (allows? [_ _ _]
     true))

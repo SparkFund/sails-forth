@@ -51,7 +51,14 @@
       (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}
                :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
              (sf/query! client (str "select Amount__c, CreatedBy.Name from Payment__c "
-                                    "where CreatedBy.Name = 'Donald'")))))
+                                    "where CreatedBy.Name = 'Donald'"))))
+      (is (= [{:Amount__c 5 :attributes {:type "Payment__c"}
+               :CreatedBy {:Name "Donald" :attributes {:type "User"}}}]
+             (sf/query! client (str "select Amount__c, CreatedBy.Name from Payment__c "
+                                    "where CreatedBy.Name IN ('Donald', 'Claire')"))))
+      (is (= []
+             (sf/query! client (str "select Amount__c, CreatedBy.Name from Payment__c "
+                                    "where CreatedBy.Name NOT IN ('Donald', 'Claire')")))))
     (testing "dates"
       (sf/create! client "Payment__c" {"Actual_Date__c" "2016-01-01"})
       (is (= (sq/query client {:find [:payment :actual-date]})
