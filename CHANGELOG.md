@@ -1,3 +1,7 @@
+## 0.11.1 (2019-09-27)
+
+* nil denotes "null" in queries
+
 ## 0.10.1 (2019-07-08)
 
 * Add support for comparison operators in soql in the memory client

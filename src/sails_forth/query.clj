@@ -46,7 +46,9 @@
     (.toString dt))
   org.joda.time.LocalDate
   (soql-value [ld]
-    (.toString ld)))
+    (.toString ld))
+  nil
+  (soql-value [_] "null"))
 
 (s/def ::where-operator
   #{:in := :or :> :< :>= :<=})
