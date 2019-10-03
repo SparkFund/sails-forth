@@ -6,7 +6,7 @@ version detection.
 
 ## Installation
 
-`[sparkfund/sails-forth "0.11.0"]`
+`[sparkfund/sails-forth "0.11.1"]`
 
 Note that the memory client now uses a dependency that does not exist in
 the common maven repositories. That repository is:
