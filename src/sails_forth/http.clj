@@ -2,6 +2,7 @@
   (:require [cheshire.parse]
             [clj-http.client :as http]
             [clojure.spec.alpha :as s]
+            [clojure.string :as string]
             [sails-forth.spec :as spec]))
 
 (def http-methods
@@ -267,12 +268,14 @@
                      (let [[url-pattern headers]
                            ;; Salesforce: not a shining example of consistency
                            (case service
-                             :data ["%s/services/%s/v%s%s"
+                             :data ["/services/%s/v%s"
                                     {"Authorization" (str "Bearer " access_token)}]
-                             :async ["%s/services/%s/%s%s"
+                             :async ["/services/%s/%s"
                                      {"X-SFDC-Session" access_token}])
-                           url (format url-pattern
-                                       instance_url (name service) version url)]
+                           prefix (format url-pattern (name service) version)
+                           url (if (string/starts-with? url prefix)
+                                 (str instance_url url) ;; url already knows its service and version, dont append prefix a second time
+                                 (str instance_url prefix url))]
                        (json-request method headers url params)))
           {:keys [status body]} response
           state (cond-> state
